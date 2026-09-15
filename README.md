@@ -181,7 +181,3 @@ recovery.
 
 Webcam capture defaults to MJPG at 1920x1080 and 60 fps. If head tracking does not start, override
 `ht_capture_fourcc`, `ht_capture_width`, `ht_capture_height` and `ht_capture_fps`.
-
-## Licence
-
-[AGPL-3.0-or-later](./LICENSE).
