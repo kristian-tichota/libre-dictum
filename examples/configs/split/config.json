@@ -1,0 +1,5 @@
+{
+  "include": ["groups/*.json", "modes/*.json"],
+  "starting_mode": "command mode",
+  "enable_systray": true
+}

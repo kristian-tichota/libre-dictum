@@ -1,0 +1,17 @@
+[libre-dictum overlay]
+Description=libre-dictum overlay
+above=true
+aboverule=2
+desktops=
+desktopsrule=2
+noborder=true
+noborderrule=2
+skippager=true
+skippagerrule=2
+skipswitcher=true
+skipswitcherrule=2
+skiptaskbar=true
+skiptaskbarrule=2
+wmclass=libre-dictum-hud
+wmclasscomplete=false
+wmclassmatch=1

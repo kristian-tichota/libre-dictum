@@ -1,0 +1,135 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libre-dictum"
+dynamic = ["version"]
+description = "Linux environment-agnostic fully customizable voice control software."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+
+authors = [
+  { name = "František Kýn" },
+  { name = "Kristian Tichota" },
+]
+dependencies = [
+  "vosk",
+  "evdev",
+  "sounddevice",
+  "pyperclip",
+  "numpy",
+]
+
+[project.scripts]
+libre-dictum = "libre_dictum.main:main"
+libre-dictum-hud = "libre_dictum.overlay.hud.__main__:main"
+
+[project.optional-dependencies]
+# torch stays on PyPI: download.pytorch.org serves no range requests, so pinning it
+# through [tool.uv.sources] makes every `uv lock` download whole wheels for metadata.
+whisper = ["openai-whisper"]
+transformers = [
+  "transformers",
+  "accelerate",
+]
+system-tray = [
+  "pystray",
+  "pillow",
+  "PyGObject",
+]
+head-tracking = [
+  "opencv-python",
+  "mediapipe",
+]
+pedals = ["hidapi"]
+overlay = [
+  "PyGObject",
+  "pycairo",
+]
+all = [
+  "libre-dictum[whisper,transformers,system-tray,head-tracking,pedals,overlay]",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.4.0",
+  "black>=24.0",
+  "pytest>=8.0",
+  "mypy>=1.10",
+  "pillow>=10.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "libre_dictum.__version__" }
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "BLE", "C4", "SIM"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+  "libre_dictum.errors",
+  "libre_dictum.pattern",
+  "libre_dictum.text",
+  "libre_dictum.mathutil",
+  "libre_dictum.pointer",
+  "libre_dictum.smoothing",
+  "libre_dictum.health",
+  "libre_dictum.status",
+  "libre_dictum.meters",
+  "libre_dictum.layers",
+  "libre_dictum.audio.vad",
+  "libre_dictum.audio.grammar",
+  "libre_dictum.audio.partials",
+  "libre_dictum.tracking.gestures",
+  "libre_dictum.tracking.hands",
+  "libre_dictum.tracking.takes",
+  "libre_dictum.tracking.tuning",
+  "libre_dictum.tracking.expressions",
+  "libre_dictum.tracking.face_tuning",
+  "libre_dictum.tracking.screenmap",
+  "libre_dictum.tracking.cameras",
+  "libre_dictum.input.dsl",
+  "libre_dictum.input.keymap",
+  "libre_dictum.pedals.reader",
+  "libre_dictum.overlay.model",
+  "libre_dictum.overlay.protocol",
+  "libre_dictum.overlay.service",
+  "libre_dictum.overlay.hud.render",
+  "libre_dictum.overlay.hud.style",
+  "libre_dictum.overlay.hud.motion",
+  "libre_dictum.overlay.hud.compositor",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_any_generics = true
+warn_return_any = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "hardware: needs /dev/uinput, a camera, a pedal board or a downloaded model",
+]

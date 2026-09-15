@@ -1,0 +1,115 @@
+{
+	"starting_mode": "command mode",
+	"reload_command": "reload config",
+	"enable_systray": true,
+
+	"enable_head_tracking": true,
+	"ht_model_path": "models/face_landmarker.task",
+	"camera": "/dev/v4l/by-id/usb-Generic_Webcam-video-index0",
+
+	"ht_dead_angle_h": 2.0,
+	"ht_dead_angle_v": 2.0,
+	"ht_full_speed_angle": 18.0,
+	"ht_max_speed_px_per_sec": 800.0,
+	"ht_speed_power": 1.5,
+
+	"ht_screen_calibration": {
+		"width_mm": 597,
+		"height_mm": 336,
+		"distance_mm": 600
+	},
+
+	"ht_hand_enabled": true,
+	"ht_hand_model_path": "models/hand_landmarker.task",
+	"ht_hand_stride": 4,
+	"ht_hand_calibration": {
+		"folded_extension": 0.30,
+		"folded_extension_thumb": 0.62,
+		"pinch_closed": 0.16,
+		"pinch_open": 0.60,
+		"spread_closed": 0.16,
+		"spread_open": 0.55,
+		"palm_area_face_on": 0.42,
+		"near_span": 0.14,
+		"far_span": 0.07
+	},
+
+	"ht_custom_gestures": {
+		"left_wink": {
+			"hold": 300,
+			"eyeBlinkLeft": { "min": 0.6, "release": 0.3 },
+			"eyeBlinkRight": { "max": 0.2, "release": 0.3 }
+		},
+		"pucker": {
+			"hold": 400,
+			"mouthPucker": { "min": 0.9, "release": 0.1 }
+		},
+		"right_pinch": {
+			"hold": 200,
+			"rightHandPinchIndex": { "min": 0.8, "release": 0.4 },
+			"rightHandHigh": { "min": 0.2, "release": 0.1 }
+		},
+		"right_fist": {
+			"hold": 250,
+			"rightHandFist": { "min": 0.8, "release": 0.4 },
+			"rightHandHigh": { "min": 0.2, "release": 0.1 }
+		}
+	},
+
+	"ht_debug_gestures": ["rightHandPinchIndex", "rightHandFist"],
+
+	"modes": {
+		"::models": {
+			"vosk": { "path": "models/vosk-model-small-en-us-0.15" }
+		},
+
+		"::pointer gestures": {
+			"gestures": {
+				"right_pinch": "left_mouse",
+				"right_fist": { "press": "hold(left_mouse)", "release": "release(left_mouse)" },
+				"pucker": "mode(precision mode)",
+				"left_wink": "mode(command mode)"
+			}
+		},
+
+		"command mode": {
+			"type": "vosk",
+			"imports": ["::models", "::pointer gestures"],
+			"icon": [0, 255, 0],
+			"ht_enabled": false,
+			"commands": {
+				"mouse mode": "mode(mouse mode)",
+				"precision mode": "mode(precision mode)"
+			}
+		},
+
+		"mouse mode": {
+			"type": "vosk",
+			"imports": ["::models", "::pointer gestures"],
+			"icon": [0, 128, 255],
+			"ht_enabled": true,
+			"ht_pointer_law": "absolute",
+			"commands": {
+				"precision mode": "mode(precision mode)",
+				"click": "left_mouse",
+				"right click": "right_mouse"
+			}
+		},
+
+		"precision mode": {
+			"type": "vosk",
+			"imports": ["::models", "::pointer gestures"],
+			"icon": [255, 200, 0],
+			"ht_enabled": true,
+			"ht_pointer_law": "rate",
+			"ht_max_speed_px_per_sec": 90,
+			"ht_full_speed_angle": 12,
+			"ht_dead_angle_h": 0.8,
+			"ht_dead_angle_v": 0.8,
+			"enter_command": "recenter()",
+			"commands": {
+				"click": "left_mouse"
+			}
+		}
+	}
+}

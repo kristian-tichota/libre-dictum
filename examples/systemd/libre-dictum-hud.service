@@ -1,0 +1,33 @@
+# The on-screen display. A second unit for the same reason it is a second program: the core
+# needs /dev/uinput and a Wayland client needs the session's display.
+#
+# Enable it only if the `overlay` extra is installed:
+#   systemctl --user enable --now libre-dictum-hud.service
+
+[Unit]
+Description=libre-dictum on-screen display
+Documentation=https://github.com/kristian-tichota/libre-dictum
+
+# Ordered after the core but not bound to it. The display reconnects to the socket
+# indefinitely, so a core that restarts must not take the chip down with it, and a core that
+# has not started yet leaves the display waiting rather than failing.
+After=graphical-session.target libre-dictum.service
+PartOf=graphical-session.target
+
+# Without gtk4-layer-shell the display starts and reports the fact. Without GTK4 it cannot
+# start at all. Neither condition warrants a restart loop.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=exec
+ExecStart=%h/libre-dictum/.venv/bin/libre-dictum-hud
+WorkingDirectory=%h/libre-dictum
+SyslogIdentifier=libre-dictum-hud
+Environment=PYTHONUNBUFFERED=1
+
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

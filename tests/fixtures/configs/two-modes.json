@@ -1,0 +1,31 @@
+{
+  "reload_command": "reload config",
+  "starting_mode": "root mode",
+  "previous_mode_keyword": "go back",
+  "modes": {
+    "::shared": {
+      "banned_strings": ["thank you"],
+      "aliases": { "^write\\((.*)\\)$": "script(copy;;\\1) + ctrl + v" },
+      "commands": { "open terminal": "alt + enter" }
+    },
+    "root mode": {
+      "type": "vosk",
+      "path": "models/small-en",
+      "icon": [0, 255, 0],
+      "imports": ["::shared"],
+      "commands": {
+        "press {any}": "{1}",
+        "{numeric} times press {any}": "{1}({2})",
+        "go to line {numeric}": "ctrl + g"
+      }
+    },
+    "dictate mode": {
+      "type": "transformer",
+      "model_name": "whisper-turbo",
+      "icon": [255, 0, 0],
+      "silence_seconds": 0.5,
+      "imports": ["::shared"],
+      "commands": { "{rest}": "write({1})" }
+    }
+  }
+}

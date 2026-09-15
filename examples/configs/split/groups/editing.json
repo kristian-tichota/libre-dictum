@@ -1,0 +1,12 @@
+{
+  "modes": {
+    "::editing": {
+      "commands": {
+        "copy that": "ctrl + c",
+        "paste that": "ctrl + v",
+        "undo that": "ctrl + z",
+        "scratch that": "backspace"
+      }
+    }
+  }
+}

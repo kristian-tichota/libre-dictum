@@ -1,0 +1,299 @@
+{
+    "enable_systray": true,
+    "reload_command": "reload config",
+    "starting_mode": "command mode",
+    "modes": {
+        "::model_configs": {
+            "input_delay": 0.01,
+            "vosk": {
+                "path": "models/vosk-model-small-en-us-0.15"
+            },
+            "transformer": {
+                "model_name": "CohereLabs/cohere-transcribe-03-2026",
+                "silence_seconds": 1,
+                "max_chunk_seconds": 3000.0,
+                "energy_threshold": 0.01,
+                "pre_roll_seconds": 0.25,
+                "lang": "en",
+                "transformer_device": "cuda"
+            }
+        },
+        "::alphabet": {
+            "commands": {
+                "type a": "a",
+                "type b": "b",
+                "type c": "c",
+                "type d": "d",
+
+                "press e": "e",
+                "press f": "f",
+                "press g": "g",
+                "press hotel": "h",
+
+                "key i": "i",
+                "key j": "j",
+                "key k": "k",
+                "key l": "l",
+
+                "pop mike": "m",
+                "pop n": "n",
+                "pop o": "o",
+                "pop p": "p",
+
+                "hit q": "q",
+                "hit r": "r",
+                "hit s": "s",
+                "hit t": "t",
+
+                "push u": "u",
+                "push v": "v",
+                "push whiskey": "w",
+                "push x": "x",
+
+                "strike y": "y",
+                "strike z": "z"
+
+            }
+        },
+        "::navigation": {
+            "commands": {
+                "step up": "up",
+                "{numeric} step up": "{1}(up)",
+                "step down": "down",
+                "{numeric} step down": "{1}(down)",
+                "step right": "right",
+                "{numeric} step right": "{1}(right)",
+                "step left": "left",
+                "{numeric} step left": "{1}(left)",
+
+                "sprint right": "ctrl + right",
+                "{numeric} sprint right": "{1}(ctrl + right)",
+                "sprint left": "ctrl +left",
+                "{numeric} sprint left": "{1}(ctrl + left)",
+
+                "limit start": "home",
+                "limit end":  "end",
+
+                "page up": "pageup",
+                "{numeric} page up": "{1}(pageup)",
+                "page control up": "ctrl + pageup",
+                "{numeric} page control up": "{1}(ctrl + pageup)",
+                "page down": "pagedown",
+                "{numeric} page down": "{1}(pagedown)",
+                "page control down": "ctrl + pagedown",
+                "{numeric} page control down": "{1}(ctrl + pagedown)"
+
+            }
+        },
+        "::control keys": {
+            "commands": {
+                "confirm enter": "enter",
+                "send escape": "esc",
+                "send space": "space",
+                "send slash": "/"
+            }
+        },
+        "::deletion": {
+            "commands": {
+                "character delete": "backspace",
+                "{numeric} character delete": "{1}(backspace)",
+                "word delete": "ctrl + backspace",
+                "{numeric} word delete": "{1}(ctrl + backspace)",
+                "line delete": "home + shift + end + backspace"
+            }
+        },
+        "::dots": {
+            "commands": {
+                "dot colon": "shift + ;",
+                "dot semi": ";",
+                "dot full": ".",
+                "dot split": ","
+            }
+        },
+        "::modifiers": {
+            "commands": {
+                "hold shift": "shift",
+                "hold control": "ctrl"
+            }
+
+        },
+        "::numbers": {
+            "commands": {
+                "number {numeric}": "{1}"
+            }
+
+        },
+        "command mode": {
+            "icon": [203, 75, 22],
+            "type": "vosk",
+            "imports": [
+                "::alphabet", "::model_configs", "::navigation",
+                "::control keys", "::deletion", "::dots",
+                "::modifiers", "::numbers"
+            ],
+            "commands": {
+                "zoom in": "ctrl + =",
+                "zoom out": "ctrl + -",
+                "zoom reset": "ctrl + 0",
+                "search text": "ctrl + f",
+                "search next": "f3",
+                "search previous": "shift + f3",
+
+                "focus left": "meta + left",
+                "focus right": "meta + right",
+                "focus up": "meta + up",
+                "focus down": "meta + down",
+                "focus display": "meta + f21",
+
+                "transit left": "meta + alt + left",
+                "transit right": "meta + alt + right",
+                "transit up": "meta + alt + up",
+                "transit down": "meta + alt + down",
+                "transit display": "meta + ctrl + f21",
+
+                "vector alpha": "f13",
+                "vector bravo": "f14",
+                "vector charlie": "f15",
+                "vector delta": "f16",
+                "vector echo": "f17",
+                "vector foxtrot": "f18",
+
+                "dispatch alpha": "meta + f13",
+                "dispatch bravo": "meta + f14",
+                "dispatch charlie": "meta + f15",
+                "dispatch delta": "meta + f16",
+                "dispatch echo": "meta + f17",
+                "dispatch foxtrot": "meta + f18",
+
+                "link alpha": "shift + ctrl + alt + -",
+                "link bravo": "shift + ctrl + alt + =",
+                "link charlie": "shift + ctrl + alt + 0",
+
+                "jump left": "space + w + n",
+                "jump right": "space + w + o",
+                "jump up": "space + w + i",
+                "jump down": "space + w + e",
+
+                "file open": "ctrl + o",
+                "buffer open": "space + .",
+                "project open": "space + space",
+                "project switch": "space + p + p",
+
+                "buffer locate": "g + s + s",
+                "buffer save": "space + f + s",
+                "buffer copy": "space + b + y",
+                "buffer split horizontal": "space + w + s",
+                "buffer split vertical": "space + w + v",
+                "buffer close": "space + w + c",
+
+                "terminate window": "meta + backspace",
+                "minimize window": "meta + end",
+                "bring up": "meta + pageup",
+                "launch browser": "ctrl + alt + shift + z",
+                "launch terminal": "alt + enter",
+                "launch application": "f22",
+
+                "drop down": "alt + down",
+
+                "grab all": "ctrl + a",
+                "text copy": "ctrl + c",
+                "text paste": "ctrl + v",
+
+                "revert change": "ctrl + z",
+                "restore change": "ctrl + y",
+
+                "save file": "ctrl + s",
+
+                "screenshot monitor": "shift + ctrl + alt + w",
+
+                "input date": "ctrl + ;",
+                "browser right": "ctrl + tab",
+                "{numeric} browser right": "{1}(ctrl + tab)",
+                "browser left": "ctrl + shift + tab",
+                "{numeric} browser left": "{1}(ctrl + shift + tab)",
+                "new tab": "ctrl + t",
+                "close tab": "ctrl + w",
+                "rescue tab": "ctrl + shift + t",
+                "refresh tab": "ctrl + r",
+                "reset tab": "ctrl + f5",
+
+                "bookmarks open": "ctrl + l + shift + 8"
+          }
+        },
+        "symbol mode": {
+            "icon": [42, 161, 152],
+            "type": "vosk",
+            "imports": [
+                "::alphabet", "::model_configs", "::navigation",
+                "::control keys", "::deletion", "::dots",
+                "::modifiers", "::numbers"
+            ],
+            "commands": {
+                "start round": "type(()",
+                "start square": "type([)",
+                "start curl": "type({)",
+                "start point": "type(<)",
+                "end round": "type())",
+                "end square": "type(])",
+                "end curl": "type(})",
+                "end point": "type(>)",
+
+                "mark bang": "type(!)",
+                "mark hash": "type(#)",
+                "mark cent": "type(%)",
+                "mark star": "type(*)",
+
+                "sign at": "type(@)",
+                "sign buck": "type($)",
+                "sign and": "type(&)",
+                "sign pipe": "type(|)",
+                "line dash": "type(-)",
+                "line low": "type(_)",
+                "line tick": "type(`)",
+                "line wave": "type(~)",
+
+                "math add": "type(\\+)",
+                "math same": "type(=)",
+                "math back": "type(\\)",
+
+                "text quote": "type(')",
+                "text twin": "type(\")",
+                "text ask": "type(?)",
+
+                "code block": "type($$)",
+                "code frac": "type(\\frac)",
+                "code root": "type(\\sqrt)",
+                "code sum": "type(\\sum)",
+
+                "calc int": "type(\\int)",
+                "calc inf": "type(\\infty)",
+                "calc hat": "type(^)",
+
+                "brace left": "type(\\{)",
+                "brace right": "type(\\})",
+
+                "stamp a": "type(\\alpha)",
+                "stamp b": "type(\\beta)",
+                "stamp g": "type(\\gamma)",
+                "stamp d": "type(\\delta)",
+
+                "form e": "type(\\epsilon)",
+                "form t": "type(\\theta)",
+                "form p": "type(\\pi)",
+                "form s": "type(\\sigma)",
+
+                "draw o": "type(\\omega)"
+            }
+        },
+
+        "dictate mode": {
+            "icon": [108, 113, 196],
+            "type": "transformer",
+            "banned_strings": ["thank you"],
+            "imports": ["::model_configs"],
+            "commands": {
+                "{rest}": "type({1}. )"
+            }
+        }
+    }
+}

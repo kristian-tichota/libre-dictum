@@ -1,0 +1,14 @@
+{
+  "modes": {
+    "::navigation": {
+      "commands": {
+        "step up": "{1=1}(up)",
+        "step down": "{1=1}(down)",
+        "step left": "{1=1}(left)",
+        "step right": "{1=1}(right)",
+        "limit start": "home",
+        "limit end": "end"
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+# libre-dictum, the core: the recognizers, /dev/uinput, the camera, the pedals, the tray.
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp examples/systemd/libre-dictum*.service ~/.config/systemd/user/
+#   sed -i "s|%h/libre-dictum|$PWD|" ~/.config/systemd/user/libre-dictum*.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now libre-dictum.service
+#
+# The path has to be edited: systemd expands %h, but the executable in ExecStart cannot be a
+# variable, so the location of the clone has to be written in once.
+
+[Unit]
+Description=libre-dictum voice control
+Documentation=https://github.com/kristian-tichota/libre-dictum
+
+# The tray icon needs a panel to appear in, so the core starts with the session. PartOf is set
+# because a logout that left the core running would keep /dev/uinput and the microphone open,
+# and a second core would type every command twice.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+# Deliberately a weak dependency: a machine without it has no sound, rather than a failed unit.
+Wants=pipewire.service
+After=pipewire.service
+
+# An absent camera or pedal board costs one subsystem rather than the session, so most faults
+# here do not warrant a restart. Two do: /dev/uinput arriving late because a udev rule applied
+# after login, and a model file that was still being written. Five attempts in two minutes,
+# after which the unit stays down, because an invalid configuration fails identically every
+# time and `systemctl --user status` is the only place that distinguishes the two.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=exec
+ExecStart=%h/libre-dictum/.venv/bin/libre-dictum
+WorkingDirectory=%h/libre-dictum
+SyslogIdentifier=libre-dictum
+Environment=PYTHONUNBUFFERED=1
+
+Restart=on-failure
+RestartSec=3
+
+# SIGTERM is the shutdown path the program is written for: it types nothing, switches no mode,
+# opens no device, and releases every key and pedal it was holding.
+#
+# The timeout has to clear one model load rather than one thread. Cancellation is checked
+# between models, so a SIGTERM arriving inside the slowest load is not acted on until that load
+# returns, which can take tens of seconds for a transformer dictation mode. A shorter timeout
+# makes a restart during startup a SIGKILL, which is the one exit that releases no key.
+KillSignal=SIGTERM
+TimeoutStopSec=45
+
+[Install]
+WantedBy=graphical-session.target

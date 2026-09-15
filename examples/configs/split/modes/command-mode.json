@@ -1,0 +1,14 @@
+{
+  "modes": {
+    "command mode": {
+      "type": "vosk",
+      "icon": [0, 200, 0],
+      "imports": ["::models", "::navigation", "::editing"],
+      "commands": {
+        "open terminal": "alt + enter",
+        "hold control": "ctrl",
+        "toggle shift": "toggle(shift)"
+      }
+    }
+  }
+}

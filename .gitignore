@@ -1,0 +1,21 @@
+config.json
+!examples/**/config.json
+.venv
+.env
+__pycache__
+.envrc
+.projectile
+models/
+scripts/
+!examples/scripts/
+*.egg-info
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.backup
+*.7z
+
+# Agent notes, local only
+CLAUDE.md
+.claude/

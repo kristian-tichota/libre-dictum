@@ -1,0 +1,68 @@
+{
+	"reload_command": "reload config",
+	"starting_mode": "root mode",
+	"enable_systray": true,
+	"enable_pedals": true,
+	"pedal": {
+		"vendor_id": "0x0fd9",
+		"product_id": "0x0086",
+		"buttons": { "left": 4, "middle": 5, "right": 6 },
+		"report_length": 8
+	},
+	"modes": {
+		"::import test": {
+			"banned_strings": ["thank you"],
+			"commands": {
+				"open terminal": "alt + enter"
+			}
+		},
+		"::pedals": {
+			"pedals": {
+				"left": { "press": "hold(left_mouse)", "release": "release(left_mouse)" },
+				"middle": "enter",
+				"right": "right_mouse"
+			}
+		},
+		"scrolling": {
+			"pedals": {
+				"left": "3(up)",
+				"middle": "mode(pedal:previous mode)",
+				"right": "3(down)"
+			}
+		},
+		"root mode": {
+			"type": "vosk",
+			"path": "models/vosk-model-small-en-us-0.15",
+			"icon": [0, 255, 0],
+			"input_delay": 0.01,
+			"imports": ["::import test", "::pedals"],
+			"commands": {
+				"feet scroll": "mode(pedal:scrolling)",
+				"press {any}": "{1}",
+				"{numeric} times press {any} ": "{1}({2})",
+				"open firefox": "exec(firefox)",
+				"text command": "python(print('Test command.'))",
+				"test plus": "type(\\+)",
+				"hold control": "hold(ctrl)",
+				"release control": "release(ctrl)",
+				"toggle shift": "toggle(shift)"
+			}
+		},
+		"dictate mode": {
+			"type": "transformer",
+			"model_name": "whisper-turbo",
+			"icon": [255, 0, 0],
+			"silence_seconds": 0.3,
+			"max_chunk_seconds": 30.0,
+			"energy_threshold": 0.01,
+			"pre_roll_seconds": 0.25,
+			"lang": "en",
+			"input_delay": 0.01,
+			"transformer_device": "auto",
+			"imports": ["::import test", "::pedals"],
+			"commands": {
+				"{rest}": "type({1})"
+			}
+		}
+	}
+}

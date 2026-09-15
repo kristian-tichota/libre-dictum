@@ -1,0 +1,10 @@
+{
+  "modes": {
+    "dictate mode": {
+      "type": "transformer",
+      "icon": [200, 0, 0],
+      "imports": ["::models"],
+      "commands": { "{rest}": "type({1})" }
+    }
+  }
+}
