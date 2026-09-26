@@ -317,6 +317,13 @@ class OverlaySettings:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlSettings:
+    """The commands another program may run, by normalized name."""
+
+    commands: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class ModeSettings:
     """A named recognizer plus everything that is scoped to it."""
 
@@ -392,6 +399,7 @@ class AppSettings:
     starting_pedal_mode: str | None = None
     templates: tuple[str, ...] = ()
     overlay: OverlaySettings = OverlaySettings()
+    control: ControlSettings | None = None
 
     @property
     def config_file(self) -> Path:
@@ -1361,6 +1369,38 @@ def _build_pedal(data: dict[str, Any]) -> PedalSettings | None:
     )
 
 
+def _build_control(data: dict[str, Any]) -> ControlSettings | None:
+    """Read the control block, or hand back None when control commands are switched off."""
+    raw = data.get("control", {})
+    if not isinstance(raw, dict):
+        raise ConfigError("'control' must be a JSON object; see docs/reference/configuration.md.")
+    if not data.get("enable_control", False):
+        return None
+
+    declared = raw.get("commands", {})
+    if not isinstance(declared, dict):
+        raise ConfigError("'control.commands' must be a JSON object mapping a name to a response.")
+
+    commands: dict[str, str] = {}
+    spelled: dict[str, str] = {}
+    for name, response in declared.items():
+        key = spoken_phrase(name)
+        if not key:
+            raise ConfigError("'control.commands' has a command with an empty name.")
+        if not isinstance(response, str) or not response.strip():
+            raise ConfigError(f"Control command {name!r} needs a response string.")
+        if key in commands:
+            raise ConfigError(
+                f"Control commands {spelled[key]!r} and {name!r} are one name once normalized."
+            )
+        commands[key] = response
+        spelled[key] = name
+
+    if not commands:
+        logger.warning("'enable_control' is on, but 'control.commands' names nothing to run.")
+    return ControlSettings(commands=commands)
+
+
 def _starting_mode(
     data: dict[str, Any], modes: dict[str, ModeSettings], templates: tuple[str, ...]
 ) -> str:
@@ -1585,43 +1625,43 @@ def _check_pedals(layer_modes: dict[str, ModeSettings], pedal: PedalSettings) ->
             )
 
 
-def _check_mode_target(target: str, settings: AppSettings, *, where: str, mode: str) -> None:
+def _check_mode_target(target: str, settings: AppSettings, *, where: str) -> None:
     """Reject a mode(...) that names something no session could switch to."""
     layer, name = parse_target(target)
+    phrase = spoken_phrase(name)
     if layer in (None, Layer.VOICE):
         table, what = settings.modes, "a runnable mode"
-        named = settings.mode_named(spoken_phrase(name))
+        named = settings.mode_named(phrase)
     else:
         table, what = settings.layer_modes, "a defined mode"
-        named = settings.layer_mode_named(spoken_phrase(name))
+        named = settings.layer_mode_named(phrase)
+        if phrase == Layer.VOICE.value:
+            return
 
-    if name in table or named is not None or spoken_phrase(name) == settings.previous_mode_keyword:
+    if name in table or named is not None or phrase == settings.previous_mode_keyword:
         return
 
     known = ", ".join(sorted(table))
-    raise ConfigError(
-        f"{where} of mode {mode!r} switches to {target!r}, which is not {what}. "
-        f"Known modes: {known}."
-    )
+    raise ConfigError(f"{where} switches to {target!r}, which is not {what}. Known modes: {known}.")
 
 
-def _check_typeable(text: str, *, where: str, mode: str) -> None:
+def _check_typeable(text: str, *, where: str) -> None:
     """Reject a literal type() the keyboard cannot produce."""
     missing = untypeable(to_ascii(text))
     if missing:
         raise ConfigError(
-            f"{where} of mode {mode!r} types {', '.join(repr(c) for c in missing)}, "
+            f"{where} types {', '.join(repr(c) for c in missing)}, "
             "which no key produces. Key codes are a US layout; see "
             "docs/reference/response-dsl.md."
         )
 
 
-def _check_hud(argument: str, *, where: str, mode: str) -> None:
+def _check_hud(argument: str, *, where: str) -> None:
     """Reject a hud(...) target no display could act on."""
     try:
         check_hud_target(argument)
     except CommandSyntaxError as exc:
-        raise ConfigError(f"{where} of mode {mode!r} cannot run: {exc}") from exc
+        raise ConfigError(f"{where} cannot run: {exc}") from exc
 
 
 def _confirm_seconds(data: dict[str, Any]) -> float:
@@ -1636,41 +1676,49 @@ def _confirm_seconds(data: dict[str, Any]) -> float:
     return seconds
 
 
-def _check_sleep(argument: str, *, where: str, mode: str, verb: str) -> None:
+def _check_sleep(argument: str, *, where: str, verb: str) -> None:
     """sleep(mouth) names no mechanism, and would put nothing to sleep for ever."""
     try:
         parse_layers(argument)
     except ValueError as exc:
-        raise ConfigError(f"{where} of mode {mode!r} has {verb}({argument}): {exc}.") from exc
+        raise ConfigError(f"{where} has {verb}({argument}): {exc}.") from exc
 
 
 def _check_responses(settings: AppSettings) -> None:
     """Reject every response that could never run, before a single model is loaded."""
     for name, mode in settings.layer_modes.items():
-        for where, response in mode.labelled_responses():
-            expanded = apply_aliases(response, mode.aliases)
+        for label, response in mode.labelled_responses():
+            _check_response(
+                apply_aliases(response, mode.aliases), settings, where=f"{label} of mode {name!r}"
+            )
+    if settings.control is not None:
+        for name, response in settings.control.commands.items():
+            _check_response(response, settings, where=f"Control command {name!r}")
 
-            unusable = invalid_placeholders(expanded)
-            if unusable:
-                raise ConfigError(
-                    f"{where} of mode {name!r} uses {', '.join(unusable)}: placeholders are "
-                    "numbered from 1, so {1} is the first capture group."
-                )
 
-            try:
-                tokens = validate_response(expanded)
-            except CommandSyntaxError as exc:
-                raise ConfigError(f"{where} of mode {name!r} cannot run: {exc}") from exc
+def _check_response(expanded: str, settings: AppSettings, *, where: str) -> None:
+    """Reject one response, aliases already applied, that could never run."""
+    unusable = invalid_placeholders(expanded)
+    if unusable:
+        raise ConfigError(
+            f"{where} uses {', '.join(unusable)}: placeholders are "
+            "numbered from 1, so {1} is the first capture group."
+        )
 
-            for token in tokens:
-                if isinstance(token, VerbToken) and token.verb == "mode":
-                    _check_mode_target(token.argument, settings, where=where, mode=name)
-                if isinstance(token, VerbToken) and token.verb == "type":
-                    _check_typeable(token.argument, where=where, mode=name)
-                if isinstance(token, VerbToken) and token.verb == "hud":
-                    _check_hud(token.argument, where=where, mode=name)
-                if isinstance(token, VerbToken) and token.verb in ("sleep", "wake"):
-                    _check_sleep(token.argument, where=where, mode=name, verb=token.verb)
+    try:
+        tokens = validate_response(expanded)
+    except CommandSyntaxError as exc:
+        raise ConfigError(f"{where} cannot run: {exc}") from exc
+
+    for token in tokens:
+        if isinstance(token, VerbToken) and token.verb == "mode":
+            _check_mode_target(token.argument, settings, where=where)
+        if isinstance(token, VerbToken) and token.verb == "type":
+            _check_typeable(token.argument, where=where)
+        if isinstance(token, VerbToken) and token.verb == "hud":
+            _check_hud(token.argument, where=where)
+        if isinstance(token, VerbToken) and token.verb in ("sleep", "wake"):
+            _check_sleep(token.argument, where=where, verb=token.verb)
 
 
 def parse_settings(
@@ -1715,6 +1763,7 @@ def parse_settings(
         starting_pedal_mode=_starting_layer_mode(data, "starting_pedal_mode", layer_modes),
         templates=templates,
         overlay=_build_overlay(data),
+        control=_build_control(data),
     )
     _check_navigate(settings.overlay)
     _check_reserved_phrases(settings.modes, settings.reserved_phrases)

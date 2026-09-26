@@ -1,6 +1,6 @@
 # Threads and locks
 
-There are eight thread kinds, of which three can type. A command **executes on the recognizer
+There are nine thread kinds, of which four can type. A command **executes on the recognizer
 thread that heard it**, with no pool and no queue between recognition and typing, so anything slow
 in a response stalls that mode.
 Every mode captures all the time; `enable()`/`disable()` only gate whether a block is processed,

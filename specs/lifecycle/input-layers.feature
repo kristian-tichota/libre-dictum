@@ -176,6 +176,14 @@ Feature: Three independent input layers
       When the configuration is loaded
       Then loading fails with an error naming "not a defined mode"
 
+    Scenario: A layer rejoins the voice layer
+      Given the command "feet back" is mapped to "mode(pedal:voice)"
+      When I say "feet scroll"
+      And I say "mouse mode"
+      And I say "feet scroll"
+      And I say "feet back"
+      Then the pedal layer is in "mouse mode"
+
   @design-decision
   Rule: The enter and exit commands belong to the voice layer
 

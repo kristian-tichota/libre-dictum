@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import IO, TYPE_CHECKING, Protocol
 
 from . import instance
+from .control.protocol import default_socket_path as default_control_path
+from .control.service import ControlService
 from .dispatch import CommandDispatcher
 from .health import FaultIndicator, Health, HealthMonitor
 from .input.devices import InputBackend, UinputBackend
@@ -31,6 +33,7 @@ from .settings import (
     ModeSettings,
     PedalSettings,
     load_settings,
+    spoken_phrase,
 )
 from .status import HeldIndicator, HeldInput, SleepIndicator
 from .streams import StreamFactory, build_stream
@@ -55,6 +58,8 @@ class StatusIndicator(ModeIndicator, FaultIndicator, HeldIndicator, SleepIndicat
 
 
 DISPLAY_SUBSYSTEM = "display socket"
+
+CONTROL_SUBSYSTEM = "control socket"
 
 PEDAL_SUBSYSTEM = "pedals"
 
@@ -114,10 +119,13 @@ class Application:
         backend: InputBackend,
         stream_factory: StreamFactory = build_stream,
         hud_socket: Path | None = None,
+        control_socket: Path | None = None,
         claim: IO[str] | None = None,
     ) -> None:
         self.backend = backend
         self._claim = claim
+        self._control_socket = control_socket
+        self.control: ControlService | None = None
         self._shutdown = threading.Event()
         self._tracker: FaceRotationTracker | None = None
         self._pedals: PedalWatcher | None = None
@@ -173,6 +181,7 @@ class Application:
                 settings,
                 backend=UinputBackend.open(),
                 hud_socket=default_socket_path() if hud else None,
+                control_socket=default_control_path(),
                 claim=claim,
             )
         except Exception:
@@ -195,6 +204,7 @@ class Application:
         self._sync_pedals()
         if self._shutdown.is_set():
             return
+        self._sync_control()
         if self.indicator is not None:
             self.indicator.show()
 
@@ -231,6 +241,8 @@ class Application:
             self._tracker.stop()
         if self._pedals is not None:
             self._pedals.stop()
+        if self.control is not None:
+            self.control.stop()
         self.modes.stop()
         self.executor.release_all()
         if self.indicator is not None:
@@ -255,6 +267,7 @@ class Application:
         self._publish_views()
         self._sync_head_tracking()
         self._sync_pedals()
+        self._sync_control()
         self._open_display_socket()
         self.refresh_health()
 
@@ -279,6 +292,8 @@ class Application:
             failures[PEDAL_SUBSYSTEM] = _describe(self._pedals.failure)
         if self.hud is not None and self.hud.failure is not None:
             failures[DISPLAY_SUBSYSTEM] = _describe(self.hud.failure)
+        if self.control is not None and self.control.failure is not None:
+            failures[CONTROL_SUBSYSTEM] = _describe(self.control.failure)
         failures.update(self._faults)
         return failures
 
@@ -294,6 +309,8 @@ class Application:
                 running.append(HAND_SUBSYSTEM)
         if self._pedals is not None:
             running.append(PEDAL_SUBSYSTEM)
+        if self.control is not None:
+            running.append(CONTROL_SUBSYSTEM)
         return running
 
     def _watch_health(self) -> None:
@@ -352,6 +369,21 @@ class Application:
 
     def _switch_mode(self, name: str) -> None:
         self.modes.switch(name)
+
+    def _on_control(self, request: str) -> str | None:
+        """Run the response another program asked for by name, or say why not."""
+        if self._shutdown.is_set():
+            return "shutting down"
+        control = self.settings.control
+        name = spoken_phrase(request)
+        response = control.commands.get(name) if control is not None else None
+        if response is None:
+            logger.warning("No control command is named %r", request)
+            return f"no control command is named {request!r}"
+        logger.info("Control command: %s", name)
+        if not self.executor.execute(response):
+            return f"{name!r} did not run; see the log"
+        return None
 
     def _on_rotation(
         self, yaw: float, pitch: float, dt: float, absolute_yaw: float, absolute_pitch: float
@@ -670,6 +702,17 @@ class Application:
         if pedals is not None:
             self._pedals = pedals
             pedals.start()
+
+    def _sync_control(self) -> None:
+        """Take control commands while the configuration asks for them, retrying a failed bind."""
+        if self.settings.control is None or self._control_socket is None:
+            if self.control is not None:
+                self.control.stop()
+                self.control = None
+            return
+        if self.control is None:
+            self.control = ControlService(self._control_socket, self._on_control)
+        self.control.start()
 
     def _create_pedals(self, settings: PedalSettings) -> PedalWatcher | None:
         try:

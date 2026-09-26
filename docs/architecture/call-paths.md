@@ -19,7 +19,8 @@ from a **partial** result, so it runs before the speaker stops. The report to th
 ## Callback threads
 
 `rotation_callback` and `gesture_callback` run on the `head-tracking` thread, and pedal edges run on
-the `pedals` thread. `chunk_callback` runs on that mode's recognizer worker, and therefore so do
+the `pedals` thread. A control request runs on the `control` thread, one connection at a time, and
+its reply is written after its response has run. `chunk_callback` runs on that mode's recognizer worker, and therefore so do
 **the whole command, the executor and the keystrokes**.
 
 ## Edges

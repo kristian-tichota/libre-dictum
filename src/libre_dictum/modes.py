@@ -255,6 +255,8 @@ class ModeManager:
             table, named = self.settings.layer_modes, self.settings.layer_mode_named(phrase)
 
         target = name if name in table else named
+        if target is None and layer is not Layer.VOICE and phrase == Layer.VOICE.value:
+            return self._layer[Layer.VOICE]
         if target is None:
             logger.warning("Cannot switch the %s layer to unknown mode %r", layer.value, name)
         return target

@@ -148,3 +148,9 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     report. The wake confirmation and a refusal both restore the chip, since waking takes two
     requests inside a window and the line stating so is drawn there. Waking restores exactly what
     was showing.
+31. **Other programs run named commands over a second socket, and nothing else.** The display socket
+    stays one-way (decision 15). The control socket is off by default, opens for this user alone, and
+    runs only the names `control.commands` declares, so a process that connects can run what the
+    configuration names and cannot type text of its own. Sleep does not gate it: no mechanism sent
+    the request, and a layout change dropped while asleep would leave the pedals out of step with
+    the program that asked for it.

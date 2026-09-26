@@ -17,6 +17,8 @@ cannot be worked around. After `start()` returns, nothing may take the session d
 | Pedal board will not open, or fails | the pedals; every pedal still down is **released** | retry ×5, then the reload phrase |
 | A missing optional extra (mediapipe, hidapi, pystray, pycairo) | that subsystem | a warning naming the extra |
 | Display socket will not bind | the displays | reload phrase |
+| Control socket will not bind | control commands | reload phrase |
+| A control request is malformed, names nothing, or its response fails | that request | the reply states the reason |
 | A display wedges (2 s write), exits, or receives a bad frame | **that display** | it reconnects, and a bad frame leaves the picture it had |
 | No `gtk4-layer-shell`, no typelib, or no layer shell in the compositor | **the layer**: one desktop, no keep-above, no click-through | the `ERROR` names the package, the build option or the window rule |
 | A response will not parse, or a script or program raises | one response, or one verb | logged, and the rest of the response still runs |

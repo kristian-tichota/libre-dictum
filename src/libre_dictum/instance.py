@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import IO
 
 from .errors import AlreadyRunningError
+from .runtime import runtime_dir
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +15,8 @@ LOCK_NAME = "libre-dictum.lock"
 
 
 def lock_path() -> Path:
-    """Where the claim lives: one per user, on the same tmpfs as the socket."""
-    runtime = os.environ.get("XDG_RUNTIME_DIR")
-    if runtime:
-        return Path(runtime) / "libre-dictum" / LOCK_NAME
-    return Path(f"/tmp/libre-dictum-{os.getuid()}") / LOCK_NAME
+    """Where the claim lives: one per user, on the same tmpfs as the sockets."""
+    return runtime_dir() / LOCK_NAME
 
 
 def claim(path: Path | None = None) -> IO[str]:

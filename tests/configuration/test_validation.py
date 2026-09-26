@@ -847,6 +847,9 @@ class TestLayerTargets:
     def test_the_go_back_keyword_works_per_layer(self, settings_of):
         settings_of(self.command("mode(pedal:previous mode)"))
 
+    def test_a_layer_may_rejoin_the_voice_layer(self, settings_of):
+        settings_of(self.command("mode(pedal:voice)"))
+
     def test_a_starting_layer_mode_may_be_a_template(self, settings_of):
         settings = settings_of({**self.CONFIG, "starting_pedal_mode": "feet"})
 
@@ -861,6 +864,46 @@ class TestLayerTargets:
 
         assert settings.starting_for(Layer.GESTURE) is None
         assert settings.starting_for(Layer.VOICE) == "root"
+
+
+class TestControlCommands:
+    def control(self, commands, *, enabled=True):
+        return {
+            "enable_pedals": True,
+            "enable_control": enabled,
+            "control": {"commands": commands},
+            "modes": {"root": {"type": "vosk", "path": "m"}, "feet": {"pedals": {}}},
+        }
+
+    def test_names_are_normalized_as_an_utterance_is(self, settings_of):
+        settings = settings_of(self.control({"Break  Started": "mode(pedal:feet)"}))
+
+        assert settings.control.commands == {"break started": "mode(pedal:feet)"}
+
+    def test_two_names_that_normalize_alike_are_refused(self, settings_of):
+        with pytest.raises(ConfigError, match="'go' and 'GO' are one name"):
+            settings_of(self.control({"go": "enter", "GO": "esc"}))
+
+    def test_a_response_that_could_never_run_names_the_command(self, settings_of):
+        with pytest.raises(ConfigError, match="Control command 'go' switches to 'pedal:nope'"):
+            settings_of(self.control({"go": "mode(pedal:nope)"}))
+
+    def test_a_missing_response_is_refused(self, settings_of):
+        with pytest.raises(ConfigError, match="'go' needs a response"):
+            settings_of(self.control({"go": ""}))
+
+    def test_the_block_must_be_an_object(self, settings_of):
+        with pytest.raises(ConfigError, match="'control' must be"):
+            settings_of({**MINIMAL, "control": ["go"]})
+
+    def test_commands_must_be_an_object(self, settings_of):
+        with pytest.raises(ConfigError, match="'control.commands' must be"):
+            settings_of({**MINIMAL, "enable_control": True, "control": {"commands": ["go"]}})
+
+    def test_nothing_is_read_while_control_is_off(self, settings_of):
+        settings = settings_of(self.control({"go": 5}, enabled=False))
+
+        assert settings.control is None
 
 
 class TestTheControlLaw:

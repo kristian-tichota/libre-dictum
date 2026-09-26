@@ -125,6 +125,22 @@ class TestAQualifiedSwitch:
             voice="mouse mode", gesture="command mode", pedal="command mode"
         )
 
+    def test_a_layer_rejoins_the_voice_layer_wherever_it_is(self, running_modes):
+        modes = running_modes(CONFIG)
+        modes.switch("mouse mode")
+        modes.switch("pedal:scrolling")
+        modes.switch("pedal:voice")
+
+        assert modes.layer_state().pedal == "mouse mode"
+
+    def test_a_mode_named_voice_is_still_that_mode(self, running_modes):
+        modes = running_modes(
+            {**CONFIG, "modes": {**CONFIG["modes"], "voice": {"pedals": {"left": "esc"}}}}
+        )
+        modes.switch("pedal:voice")
+
+        assert modes.layer_state().pedal == "voice"
+
     def test_a_template_is_refused_for_the_voice_layer(self, running_modes, caplog):
         modes = running_modes(CONFIG)
         modes.switch("voice:scrolling")

@@ -26,6 +26,7 @@ dependencies = [
 [project.scripts]
 libre-dictum = "libre_dictum.main:main"
 libre-dictum-hud = "libre_dictum.overlay.hud.__main__:main"
+libre-dictum-send = "libre_dictum.control.send:main"
 
 [project.optional-dependencies]
 # torch stays on PyPI: download.pytorch.org serves no range requests, so pinning it
@@ -98,6 +99,11 @@ module = [
   "libre_dictum.status",
   "libre_dictum.meters",
   "libre_dictum.layers",
+  "libre_dictum.runtime",
+  "libre_dictum.sockets",
+  "libre_dictum.control.protocol",
+  "libre_dictum.control.service",
+  "libre_dictum.control.send",
   "libre_dictum.audio.vad",
   "libre_dictum.audio.grammar",
   "libre_dictum.audio.partials",

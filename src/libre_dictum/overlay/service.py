@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import socket
 import threading
 from collections.abc import Callable, Mapping, Sequence
@@ -15,6 +14,7 @@ from ..input.dsl import hud_group
 from ..layers import LayerState, SleepView
 from ..meters import GestureMeter, HandReading
 from ..settings import OverlaySettings
+from ..sockets import listen_privately, staging_path
 from ..status import HeldInput
 from . import protocol
 from .model import Heard, ModeView, Page, Sheet, Snapshot
@@ -26,9 +26,6 @@ MAX_CLIENTS = 4
 WRITE_TIMEOUT_SECONDS = 2.0
 
 _IDLE_POLL_SECONDS = 0.2
-
-_DIRECTORY_MODE = 0o700
-_SOCKET_MODE = 0o600
 
 
 class _Client:
@@ -103,9 +100,7 @@ class HudService:
         write_timeout: float = WRITE_TIMEOUT_SECONDS,
     ) -> None:
         self.path = protocol.check_socket_path(Path(path))
-        self._staging = protocol.check_socket_path(
-            self.path.with_name(f".{self.path.name}.{os.getpid()}")
-        )
+        self._staging = protocol.check_socket_path(staging_path(self.path))
         self.failure: BaseException | None = None
 
         self._max_clients = max_clients
@@ -173,21 +168,8 @@ class HudService:
 
     def _bind(self) -> socket.socket:
         """A listening socket at path, reachable by nobody else."""
-        self.path.parent.mkdir(parents=True, exist_ok=True, mode=_DIRECTORY_MODE)
         self._refuse_a_second_core()
-
-        self._staging.unlink(missing_ok=True)
-        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        try:
-            listener.bind(str(self._staging))
-            os.chmod(self._staging, _SOCKET_MODE)
-            listener.listen(self._max_clients)
-            os.rename(self._staging, self.path)
-        except OSError:
-            listener.close()
-            self._staging.unlink(missing_ok=True)
-            raise
-        return listener
+        return listen_privately(self.path, self._staging, backlog=self._max_clients)
 
     def _refuse_a_second_core(self) -> None:
         """Fail when another running instance holds the socket."""

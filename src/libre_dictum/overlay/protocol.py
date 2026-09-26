@@ -10,6 +10,7 @@ from typing import IO, TYPE_CHECKING, Any
 from ..errors import ProtocolError
 from ..layers import Layer
 from ..meters import GestureMeter, HandReading, Reading
+from ..runtime import runtime_dir
 from ..status import HeldInput, canonical
 
 if TYPE_CHECKING:
@@ -648,10 +649,7 @@ def default_socket_path() -> Path:
     override = os.environ.get(SOCKET_ENV)
     if override:
         return Path(override)
-    runtime = os.environ.get("XDG_RUNTIME_DIR")
-    if runtime:
-        return Path(runtime) / "libre-dictum" / SOCKET_NAME
-    return Path(f"/tmp/libre-dictum-{os.getuid()}") / SOCKET_NAME
+    return runtime_dir() / SOCKET_NAME
 
 
 def check_socket_path(path: Path) -> Path:

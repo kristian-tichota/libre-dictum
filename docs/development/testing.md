@@ -21,11 +21,12 @@ extras installed.
 | `WedgedSocket` / `BrokenSocket` | a display that stopped reading, or whose write fails | that publishing does no I/O, and that such a display is dropped |
 
 `socket_path` exists because `AF_UNIX` takes 107 bytes and `tmp_path` is named after the test.
-`hud_socket` defaults to `None`, meaning no socket at all, so nothing binds in a suite that is not
-about the display. Injection points beyond the fixtures: `ModeManager(stream_factory=, indicator=,
-settings_loader=)`, `InputExecutor(backend, mode_switcher=, sleep=)`, `TransformerStream(transcriber=)`,
-`FaceRotationTracker(retry_delays=)`, `Application(backend=, stream_factory=, hud_socket=)` and
-`HudService(path, max_clients=, write_timeout=)`.
+`hud_socket` and `control_socket` default to `None`, meaning no socket at all, so nothing binds in a
+suite that is not about that socket. Injection points beyond the fixtures:
+`ModeManager(stream_factory=, indicator=, settings_loader=)`, `InputExecutor(backend,
+mode_switcher=, sleep=)`, `TransformerStream(transcriber=)`, `FaceRotationTracker(retry_delays=)`,
+`Application(backend=, stream_factory=, hud_socket=, control_socket=)`, `HudService(path,
+max_clients=, write_timeout=)` and `ControlService(path, handler, timeout=)`.
 
 The `↓` and `↑` notation for press and release is borrowed from `specs/`, so a scenario and its test
 read alike.

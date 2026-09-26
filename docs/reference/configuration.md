@@ -46,6 +46,8 @@ rather than chosen has an ordered procedure in [Calibration order](calibration.m
 | `enable_head_tracking` | boolean | `false` | Pointer and gestures from a webcam. Needs `head-tracking`. |
 | `enable_pedals` | boolean | `false` | USB HID pedal board. Needs `pedals`. |
 | `pedal` | object | Stream Deck Pedal's numbers | Which device, and which report byte is which pedal. See [Pedals](#pedals). |
+| `enable_control` | boolean | `false` | Run the named commands other programs send. See [Control](#control). |
+| `control` | object | `{}` | The names another program may send, and what each runs. |
 | `starting_gesture_mode` | string or `null` | follows `starting_mode` | Where the **gesture layer** starts. May name a template, subject to the constraint in [Input layers](#input-layers). |
 | `starting_pedal_mode` | string or `null` | follows `starting_mode` | The same for the pedal layer. |
 | `overlay` | object | see [Display](#the-on-screen-display) | Phrases that show, hide and navigate the surfaces. |
@@ -77,6 +79,7 @@ others costs nothing.
 | `mode(voice:mouse mode)` | voice only. Must name a runnable mode |
 | `mode(gesture:x)` / `mode(pedal:x)` | that layer only. **May name an import template** |
 | `mode(pedal:previous mode)` | that layer, back where it came from |
+| `mode(pedal:voice)` | that layer, onto the voice layer's mode, unless a mode is named `voice` |
 
 - A bare spoken mode name, the previous-mode phrase, and an unqualified `mode()` all move all three.
   Each layer returns to *its own* previous mode.
@@ -175,6 +178,30 @@ toggle on a pedal that is also bound to `hold(ctrl)`.
 The taps still perform their own bindings, and nothing is suppressed or delayed. The run is
 forgotten once one has matched, so a **shorter run always wins over a longer one**; bind one or the
 other, not both. A release the device still owes completes nothing.
+
+## Control
+
+Other programs run named commands over a unix socket that only this user can open:
+`$XDG_RUNTIME_DIR/libre-dictum/control.sock`, or `$LIBRE_DICTUM_CONTROL_SOCKET`. Only the names in
+`control.commands` run. A command runs while a mechanism sleeps, because no mechanism sent it.
+
+```json
+"enable_control": true,
+"control": {
+  "commands": {
+    "break started": "mode(pedal:break pedals)",
+    "break over": "mode(pedal:voice)"
+  }
+}
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `commands` | `{}` | Name to response. A name is normalized as an utterance is; two names that normalize alike are an error. |
+
+`libre-dictum-send break started` sends one, joining its words. It exits 0 when the command ran, 1
+when it was refused and 2 when nothing answered; `python -m libre_dictum.control.send` is the same
+program. A request is one UTF-8 line, and its reply is `ok` or `error:` with the reason.
 
 ## Modes
 
@@ -708,6 +735,7 @@ The following conditions are checked at load.
 - No `ht_hand_calibration` pair has coinciding ends, and unknown `ht_*` keys are rejected.
 - `overlay.sheet.navigate` is one word, and `overlay.output.name` is a non-empty string or null.
 - No generated phrase collides with a command.
+- Every `control.commands` response passes the response checks above.
 
 A `hud(group:…)` naming no group is a **warning** rather than an error, because group names are
 derived, so deleting one command can merge a family into `misc`. A display asked for a group it does
