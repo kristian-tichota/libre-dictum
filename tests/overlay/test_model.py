@@ -1,7 +1,7 @@
 import pytest
 
 from libre_dictum.overlay import model
-from libre_dictum.overlay.model import MISC, ModeView, RouteKind, Sheet
+from libre_dictum.overlay.model import MISC, EdgeAction, ModeView, RouteKind, Sheet
 from libre_dictum.pattern import CommandPattern
 from libre_dictum.settings import Command, EdgeBinding, ModeKind, ModeSettings, Origin
 
@@ -283,6 +283,11 @@ class TestRoutes:
         gestures = [r for r in view.routes if r.kind is RouteKind.GESTURE]
 
         assert [(r.by, r.target) for r in gestures] == [("fist released", "command mode")]
+
+    def test_a_gesture_standing_in_for_a_pedal_shows_the_pedal(self):
+        view = model.build_view(mode(gestures={"open": EdgeBinding(pedal="left")}), modes=["m"])
+
+        assert view.gestures == (EdgeAction(name="open", press="left pedal", release="left pedal"),)
 
     def test_a_command_that_switches_is_a_route(self):
         session = mode(commands=[command("go dictate", "mode(dictate mode)")])

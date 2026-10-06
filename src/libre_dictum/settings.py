@@ -217,10 +217,11 @@ class HeadTrackingSettings:
 
 @dataclass(frozen=True, slots=True)
 class EdgeBinding:
-    """What one pedal or gesture does on each edge."""
+    """What one pedal or gesture does on each edge, or the pedal a gesture stands in for."""
 
     press: str | None = None
     release: str | None = None
+    pedal: str | None = None
 
     def response(self, *, pressed: bool) -> str | None:
         """The response for one edge, or None when this binding ignores it."""
@@ -736,6 +737,16 @@ def _edge_bindings(
                 "response, which fires on the way in, or an object with 'press' and/or "
                 "'release'."
             )
+
+        if section == "gestures" and "pedal" in entry:
+            pedal = entry["pedal"]
+            if set(entry) != {"pedal"} or not isinstance(pedal, str) or not pedal.strip():
+                raise ConfigError(
+                    f"Gesture {name!r} in mode {mode_name!r} stands in for a pedal, so it has "
+                    "'pedal' naming one pedal and nothing else."
+                )
+            bindings[name] = EdgeBinding(pedal=pedal.strip())
+            continue
 
         unknown = set(entry) - {"press", "release"}
         if unknown:
@@ -1623,6 +1634,13 @@ def _check_pedals(layer_modes: dict[str, ModeSettings], pedal: PedalSettings) ->
                 f"{', '.join(pedal.buttons) or '(none)'}. Several names separated by "
                 "spaces are a sequence of bare taps."
             )
+        for gesture, binding in mode.gestures.items():
+            if binding.pedal is not None and binding.pedal not in pedal.buttons:
+                raise ConfigError(
+                    f"Mode {name!r} has the gesture {gesture!r} stand in for the pedal "
+                    f"{binding.pedal!r}, which 'pedal.buttons' does not define. Defined pedals: "
+                    f"{', '.join(pedal.buttons) or '(none)'}."
+                )
 
 
 def _check_mode_target(target: str, settings: AppSettings, *, where: str) -> None:

@@ -14,6 +14,7 @@ from ..meters import GestureMeter, HandReading
 from ..settings import (
     AppSettings,
     Command,
+    EdgeBinding,
     GroupDisplay,
     ModeKind,
     ModeSettings,
@@ -451,14 +452,19 @@ def build_view(
             EdgeAction(name=name, press=binding.press or "", release=binding.release or "")
             for name, binding in mode.pedals.items()
         ),
-        gestures=tuple(
-            EdgeAction(name=name, press=binding.press or "", release=binding.release or "")
-            for name, binding in mode.gestures.items()
-        ),
+        gestures=tuple(_gesture_action(name, binding) for name, binding in mode.gestures.items()),
         previous_keyword=previous_keyword,
         navigable=navigable,
         runnable=mode.kind is not ModeKind.IMPORT,
     )
+
+
+def _gesture_action(name: str, binding: EdgeBinding) -> EdgeAction:
+    """One gesture's edges as a display shows them, a stand-in as the pedal it presses."""
+    if binding.pedal is not None:
+        label = f"{binding.pedal} pedal"
+        return EdgeAction(name=name, press=label, release=label)
+    return EdgeAction(name=name, press=binding.press or "", release=binding.release or "")
 
 
 def colliding_phrases(view: ModeView, mode: ModeSettings, reserved: Iterable[str]) -> list[str]:

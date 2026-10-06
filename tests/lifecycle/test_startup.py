@@ -37,6 +37,7 @@ CONFIG = {
             "pedals": {"left": "up"},
             "gestures": {"fist": {"press": "pageup", "release": "pagedown"}},
         },
+        "hands": {"gestures": {"open": {"pedal": "left"}}},
     },
 }
 
@@ -432,6 +433,42 @@ class TestPedalCallbacks:
 
         assert app.modes.active == "dictate mode"
         assert app.modes.layer_state().pedal == "scrolling"
+
+
+class TestAGestureStandsInForAPedal:
+    def test_it_does_what_the_pedal_does_on_both_edges(self, app, backend):
+        app.start()
+        app.modes.switch("gesture:hands")
+        app._on_gesture("open", True)
+        app._on_gesture("open", False)
+
+        assert backend.sequence == "left_mouse↓ left_mouse↑"
+
+    def test_it_follows_the_pedal_layer(self, app, backend):
+        app.start()
+        app.modes.switch("gesture:hands")
+        app.modes.switch("pedal:scrolling")
+        app._on_gesture("open", True)
+
+        assert backend.sequence == "up↓ up↑"
+
+    def test_a_pedal_the_layout_does_not_bind_does_nothing(self, app, backend):
+        app.start()
+        app.modes.switch("gesture:hands")
+        app.modes.switch("pedal:dictate mode")
+        app._on_gesture("open", True)
+        app._on_gesture("open", False)
+
+        assert backend.events == []
+
+    def test_its_release_runs_what_its_press_began(self, app, backend):
+        app.start()
+        app.modes.switch("gesture:hands")
+        app._on_gesture("open", True)
+        app.modes.switch("pedal:scrolling")
+        app._on_gesture("open", False)
+
+        assert backend.sequence == "left_mouse↓ left_mouse↑"
 
 
 class TestAReleaseRunsWhatItsPressCaptured:

@@ -200,6 +200,22 @@ Feature: Three independent input layers
       When I say "mouse mode"
       Then the key sequence "f1↓ f1↑" is emitted
 
+  Rule: A gesture can stand in for a pedal
+
+    A gesture bound as `{"pedal": "left"}` does what the left pedal does in the pedal layer's
+    mode, so a hand and a foot alternate on one layout.
+
+    Scenario: The gesture presses the pedal of the pedal layer
+      Given the gesture "open" is mapped to the pedal "left"
+      When I say "feet scroll"
+      And the gesture "open" fires
+      Then the key sequence "up↓ up↑ up↓ up↑ up↓ up↑" is emitted
+
+    Scenario: A stand-in for a pedal the board has not got is refused
+      Given the gesture "open" is mapped to the pedal "pinky"
+      When the configuration is loaded
+      Then loading fails with an error naming "pinky"
+
   Rule: Every layer remembers where it came from
 
     Scenario: Going back on the pedals leaves the voice layer alone

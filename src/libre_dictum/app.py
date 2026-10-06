@@ -486,8 +486,9 @@ class Application:
         """Run one gesture or pedal edge under the binding its press saw."""
         held = (layer, name)
         if pressed:
-            if mode is None or (binding := self._bound(mode, layer, name)) is None:
+            if mode is None or (bound := self._bound(mode, layer, name)) is None:
                 return
+            mode, binding = bound
             if not self._may_act(layer, mode, binding.response(pressed=True)):
                 return
             with self._held_lock:
@@ -502,11 +503,17 @@ class Application:
                 return
         self._perform(mode, binding.response(pressed=pressed), layer)
 
-    @staticmethod
-    def _bound(mode: ModeSettings, layer: Layer, name: str) -> EdgeBinding | None:
-        """What mode binds to one gesture or one pedal, if anything."""
+    def _bound(
+        self, mode: ModeSettings, layer: Layer, name: str
+    ) -> tuple[ModeSettings, EdgeBinding] | None:
+        """The mode and binding one edge runs under, a stand-in's from the pedal layer."""
         bindings = mode.gestures if layer is Layer.GESTURE else mode.pedals
-        return bindings.get(name)
+        binding = bindings.get(name)
+        if binding is None or binding.pedal is None:
+            return None if binding is None else (mode, binding)
+        pedals = self.modes.mode_for(Layer.PEDAL)
+        stood = pedals.pedals.get(binding.pedal) if pedals is not None else None
+        return None if stood is None else (pedals, stood)
 
     def asleep(self, layer: Layer | None = None) -> bool:
         """Whether the named mechanism is beyond reach, or every mechanism when none is named."""

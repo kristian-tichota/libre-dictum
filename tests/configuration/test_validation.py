@@ -392,6 +392,15 @@ class TestGestureBindings:
         with pytest.raises(ConfigError, match="Gesture 'fist' on release.*not a runnable mode"):
             self.build(settings_of, {"release": "mode(typo)"})
 
+    def test_a_gesture_may_stand_in_for_a_pedal(self, settings_of):
+        binding = self.build(settings_of, {"pedal": "left"})["fist"]
+
+        assert (binding.pedal, binding.press, binding.release) == ("left", None, None)
+
+    def test_a_stand_in_names_a_pedal_and_nothing_else(self, settings_of):
+        with pytest.raises(ConfigError, match="'pedal' naming one pedal and nothing else"):
+            self.build(settings_of, {"pedal": "left", "press": "enter"})
+
 
 class TestFeatureNames:
     """A misspelled feature is a load error."""
@@ -713,6 +722,18 @@ class TestPedalNames:
         )
 
         assert settings.modes["root"].pedals["left"].press == "enter"
+
+    def test_a_stand_in_for_an_undefined_pedal_lists_the_ones_the_board_has(self, settings_of):
+        with pytest.raises(ConfigError, match="'open'.*'middle'.*Defined pedals: left, right"):
+            settings_of(
+                {
+                    **self.DEVICE,
+                    "modes": {
+                        "root": {"type": "vosk", "path": "m"},
+                        "hands": {"gestures": {"open": {"pedal": "middle"}}},
+                    },
+                }
+            )
 
     def test_pedals_are_not_checked_without_a_device(self, settings_of):
         settings_of({"modes": {"root": {"type": "vosk", "path": "m", "pedals": {"no": "esc"}}}})

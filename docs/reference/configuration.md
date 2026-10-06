@@ -497,6 +497,11 @@ The shipped set is facial only, for the reason given under [Calibration](#calibr
 | `"fist": "left_mouse"` | run when the gesture becomes **active** |
 | `"fist": {"press": …, "release": …}` | either may be omitted |
 | `"fist": null` | deliberately nothing |
+| `"open": {"pedal": "left"}` | both edges of the pedal `left` in the **pedal layer's** mode |
+
+A gesture that stands in for a pedal follows the pedal layer, so one binding serves every pedal
+layout, and its release runs what its press began. Naming a pedal the board has not got is a load
+error.
 
 The release edge is what makes a held button safe. A fist pressing `hold(left_mouse)` is a drag, and
 that drag ends when the hand opens, when the hand leaves the frame, or when the hand model fails. A
