@@ -110,23 +110,23 @@ class TestSleepAndWake:
     """Two verbs, so a doubled ask is a no-op."""
 
     def test_sleep_asks_for_sleep(self, backend):
-        asked: list[tuple[str, bool, object]] = []
+        asked: list[tuple[str, bool, object, bool]] = []
         executor = InputExecutor(backend, sleeper=lambda *call: asked.append(call))
 
         executor.execute("sleep(gesture)", origin=Layer.PEDAL)
 
-        assert asked == [("gesture", True, Layer.PEDAL)]
+        assert asked == [("gesture", True, Layer.PEDAL, False)]
 
     def test_wake_asks_for_the_other_direction(self, backend):
-        asked: list[tuple[str, bool, object]] = []
+        asked: list[tuple[str, bool, object, bool]] = []
         executor = InputExecutor(backend, sleeper=lambda *call: asked.append(call))
 
         executor.execute("wake()")
 
-        assert asked == [("", False, None)]
+        assert asked == [("", False, None, False)]
 
     def test_the_origin_does_not_leak_into_the_next_response(self, backend):
-        asked: list[tuple[str, bool, object]] = []
+        asked: list[tuple[str, bool, object, bool]] = []
         executor = InputExecutor(backend, sleeper=lambda *call: asked.append(call))
 
         executor.execute("sleep()", origin=Layer.PEDAL)
@@ -134,13 +134,22 @@ class TestSleepAndWake:
 
         assert [call[2] for call in asked] == [Layer.PEDAL, None]
 
+    def test_a_program_s_ask_is_marked_and_does_not_leak_either(self, backend):
+        asked: list[tuple[str, bool, object, bool]] = []
+        executor = InputExecutor(backend, sleeper=lambda *call: asked.append(call))
+
+        executor.execute("wake()", from_program=True)
+        executor.execute("wake()")
+
+        assert [call[3] for call in asked] == [True, False]
+
     def test_without_a_switch_it_is_reported(self, executor, caplog):
         executor.execute("sleep()")
 
         assert "sleep switch" in caplog.text
 
     def test_a_switch_that_raises_does_not_take_the_thread_with_it(self, backend, caplog):
-        def boom(argument, asleep, origin):
+        def boom(argument, asleep, origin, from_program):
             raise RuntimeError("no")
 
         executor = InputExecutor(backend, sleeper=boom)

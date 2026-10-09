@@ -152,11 +152,15 @@ class SleepSwitch:
         asleep: bool,
         now: float,
         by: Layer | None = None,
+        from_program: bool = False,
     ) -> Confirmation:
-        """Ask for layers to sleep or to wake."""
+        """Ask for layers to sleep or to wake; a program's ask applies at once, whoever owns it."""
         wanted = frozenset(layers)
         if all((layer in self._asleep) is asleep for layer in wanted):
             return Confirmation.IDLE
+
+        if from_program:
+            return self._apply(wanted, asleep=asleep, by=None)
 
         if not asleep and (refused := self._not_theirs(wanted, by)):
             self._notice = f"refused: only {_named(refused)} wakes this"
@@ -165,18 +169,22 @@ class SleepSwitch:
 
         asking = (wanted, asleep)
         if self._pending == asking and now <= self._deadline:
-            self._pending = None
-            self._notice = None
-            if asleep:
-                self._asleep.update(dict.fromkeys(wanted, by))
-            else:
-                for layer in wanted:
-                    self._asleep.pop(layer, None)
-            return Confirmation.APPLIED
+            return self._apply(wanted, asleep=asleep, by=by)
 
         self._pending = asking
         self._deadline = now + self.confirm_seconds
         return Confirmation.ARMED
+
+    def _apply(self, wanted: frozenset[Layer], *, asleep: bool, by: Layer | None) -> Confirmation:
+        """Put wanted to sleep, owned by by, or wake it, leaving nothing armed."""
+        self._pending = None
+        self._notice = None
+        if asleep:
+            self._asleep.update(dict.fromkeys(wanted, by))
+        else:
+            for layer in wanted:
+                self._asleep.pop(layer, None)
+        return Confirmation.APPLIED
 
     def view(self, now: float) -> SleepView:
         """The picture for a display, with anything that has expired already forgotten."""

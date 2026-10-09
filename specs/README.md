@@ -125,7 +125,7 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     which means a mode binding nothing would still switch modes whenever the room said its name. A
     request arms, and only its repeat inside `sleep_confirm_seconds` applies it. `sleep` and `wake`
     are deterministic and never a toggle. **The mechanism that confirms a sleep owns it** and a wake
-    from elsewhere is refused, which is what makes a deliberately harder wake worth configuring,
+    from another mechanism is refused (a program is not one; decision 31), which is what makes a deliberately harder wake worth configuring,
     while a successful reload wakes everything and is subject to no ownership check, so that an
     edited-away binding or a disconnected board cannot make a sleep permanent.
 28. **A run of bare pedal taps is a toggle that a held modifier can carry.** A tap is a press under
@@ -153,4 +153,6 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     runs only the names `control.commands` declares, so a process that connects can run what the
     configuration names and cannot type text of its own. Sleep does not gate it: no mechanism sent
     the request, and a layout change dropped while asleep would leave the pedals out of step with
-    the program that asked for it.
+    the program that asked for it. Its own `sleep` or `wake` applies at once and whoever owns the
+    sleep, because a request no mechanism sent cannot be a misread, and a program that covers the
+    screen would otherwise leave the user with no way back.

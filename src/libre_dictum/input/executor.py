@@ -67,7 +67,7 @@ class InputExecutor:
         on_held_change: Callable[[HeldInput], None] | None = None,
         display: Callable[[str], None] | None = None,
         recenter: Callable[[], None] | None = None,
-        sleeper: Callable[[str, bool, Layer | None], None] | None = None,
+        sleeper: Callable[[str, bool, Layer | None, bool], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._backend = backend
@@ -84,6 +84,7 @@ class InputExecutor:
         self.typed = 0
         self._type_delay = DEFAULT_TYPE_DELAY
         self._origin: Layer | None = None
+        self._from_program = False
         self._verbs: dict[str, Callable[[str], None]] = {
             "mode": self._verb_mode,
             "save": self._verb_save,
@@ -105,10 +106,12 @@ class InputExecutor:
         type_delay: float = DEFAULT_TYPE_DELAY,
         aliases: dict[str, str] | None = None,
         origin: Layer | None = None,
+        from_program: bool = False,
     ) -> bool:
         """Run one response string."""
         with self._lock:
             self._origin = origin
+            self._from_program = from_program
             executed = self._execute(
                 response, input_delay=input_delay, type_delay=type_delay, aliases=aliases
             )
@@ -289,7 +292,7 @@ class InputExecutor:
             verb = "sleep" if asleep else "wake"
             logger.warning("%s(%s) ignored: no sleep switch is wired up", verb, argument)
             return
-        self._sleeper(argument, asleep, self._origin)
+        self._sleeper(argument, asleep, self._origin, self._from_program)
 
     def _verb_recenter(self, argument: str) -> None:
         """Take the head's current pose as the pointer's neutral."""

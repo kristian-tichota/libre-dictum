@@ -186,7 +186,8 @@ Feature: Putting a mechanism beyond reach
     A sleep entered with the feet may be undone only by the feet. That is the purpose of using the
     feet: the voice and the camera are not to be relied on for the next few minutes, and a sleep
     either of them could undo would not be worth entering. The rule is general rather than a pedal
-    exception, so that every route is definitive in the same way.
+    exception, so that every route is definitive in the same way. A command from another program is
+    not a mechanism and is not bound by it (`control.feature`).
 
     The mechanism that **confirms** a sleep owns it — arming may come from anywhere, and the ask
     that applied it is the one that counts.

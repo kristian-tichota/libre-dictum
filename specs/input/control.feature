@@ -40,6 +40,14 @@ Feature: Commands from other programs
       When a program sends "break started"
       Then the pedal layer is in "break pedals"
 
+    Scenario: Its wake applies at once, whoever slept the mechanisms
+      # No mechanism sent it, so it cannot be a misread, and a program that covers the screen
+      # needs the mechanisms back
+      Given the control command "break started" is mapped to "wake() + mode(pedal:break pedals)"
+      And the pedals put every mechanism to sleep
+      When a program sends "break started"
+      Then nothing is asleep
+
   Rule: Anything else is refused
 
     Scenario: An undeclared name

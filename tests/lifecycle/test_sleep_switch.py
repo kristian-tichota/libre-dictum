@@ -212,6 +212,23 @@ class TestWhoeverSleptItWakesIt:
             Confirmation.ARMED
         )
 
+    def test_a_program_wakes_it_at_once_whoever_owns_it(self):
+        switch = self.slept(Layer.PEDAL)
+
+        assert switch.request(ALL_LAYERS, asleep=False, now=2.0, from_program=True) is (
+            Confirmation.APPLIED
+        )
+        assert not switch.view(2.0).dozing
+
+    def test_a_program_s_sleep_belongs_to_nobody(self):
+        switch = SleepSwitch()
+        switch.request({Layer.PEDAL}, asleep=True, now=0.0, from_program=True)
+
+        assert switch.asleep(Layer.PEDAL)
+        assert switch.request({Layer.PEDAL}, asleep=False, now=1.0, by=Layer.VOICE) is (
+            Confirmation.ARMED
+        )
+
     def test_the_owner_is_whoever_confirmed_it(self):
         switch = SleepSwitch()
         switch.request(ALL_LAYERS, asleep=True, now=0.0, by=Layer.GESTURE)

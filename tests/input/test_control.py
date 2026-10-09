@@ -27,6 +27,7 @@ CONFIG = {
             "break started": "mode(pedal:break pedals)",
             "break over": "mode(pedal:voice)",
             "say hi": "type(hi)",
+            "break woke": "wake() + mode(pedal:break pedals)",
         }
     },
     "modes": {
@@ -114,6 +115,17 @@ class TestADeclaredName:
 
         send("break started", socket_path)
 
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_its_wake_applies_at_once_whoever_slept_the_mechanisms(self, running, socket_path):
+        app = running()
+        app._request_sleep("", True, Layer.PEDAL)
+        app._request_sleep("", True, Layer.PEDAL)
+        assert app.asleep()
+
+        assert send("break woke", socket_path) is None
+
+        assert not any(app.asleep(layer) for layer in Layer)
         assert app.modes.layer_state().pedal == "break pedals"
 
     def test_several_requests_share_one_connection(self, running, socket_path):

@@ -381,7 +381,7 @@ class Application:
             logger.warning("No control command is named %r", request)
             return f"no control command is named {request!r}"
         logger.info("Control command: %s", name)
-        if not self.executor.execute(response):
+        if not self.executor.execute(response, from_program=True):
             return f"{name!r} did not run; see the log"
         return None
 
@@ -520,12 +520,20 @@ class Application:
         with self._sleep_lock:
             return self._sleep.all_asleep if layer is None else self._sleep.asleep(layer)
 
-    def _request_sleep(self, argument: str, asleep: bool, origin: Layer | None = None) -> None:
+    def _request_sleep(
+        self,
+        argument: str,
+        asleep: bool,
+        origin: Layer | None = None,
+        from_program: bool = False,
+    ) -> None:
         """One sleep(...) or wake(...)."""
         layers = parse_layers(argument)
         verb = "sleep" if asleep else "wake"
         with self._sleep_lock:
-            outcome = self._sleep.request(layers, asleep=asleep, now=time.monotonic(), by=origin)
+            outcome = self._sleep.request(
+                layers, asleep=asleep, now=time.monotonic(), by=origin, from_program=from_program
+            )
         if outcome is Confirmation.IDLE:
             logger.debug("%s(%s) changes nothing", verb, argument)
         elif outcome is Confirmation.REFUSED:
@@ -539,7 +547,8 @@ class Application:
             logger.info("%s(%s) is armed; repeat it to confirm", verb, argument)
             self._time_out_arming()
         else:
-            logger.info("%s(%s) applied by %s", verb, argument, origin or "nothing in particular")
+            by = "another program" if from_program else origin or "nothing in particular"
+            logger.info("%s(%s) applied by %s", verb, argument, by)
             if asleep:
                 self.executor.release_all()
                 self._forget_held()
