@@ -69,6 +69,11 @@ class LayerState:
         )
 
 
+def parse_names(argument: str) -> tuple[str, ...]:
+    """ "dictate mode, symbol mode" as the names it lists, blanks left out."""
+    return tuple(part.strip() for part in argument.split(",") if part.strip())
+
+
 def parse_layers(argument: str) -> frozenset[Layer]:
     """ "gesture" or "gesture, pedal" as layers; empty argument means all of them."""
     names = [part.strip().lower() for part in argument.split(",") if part.strip()]

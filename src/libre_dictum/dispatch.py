@@ -134,7 +134,7 @@ class CommandDispatcher:
 
     def _switch(self, utterance: str, target: str) -> None:
         """Switch to target, unless mode switches are locked."""
-        if self._modes.locked:
+        if not self._modes.reachable(target):
             logger.info("Mode switches are locked; %r does not switch", utterance)
             self._report(utterance)
             return

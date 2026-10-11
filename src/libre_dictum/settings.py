@@ -21,7 +21,7 @@ from .input.dsl import (
 )
 from .input.executor import DEFAULT_TYPE_DELAY
 from .input.keymap import untypeable
-from .layers import DEFAULT_CONFIRM_SECONDS, Layer, parse_layers, parse_target
+from .layers import DEFAULT_CONFIRM_SECONDS, Layer, parse_layers, parse_names, parse_target
 from .pattern import CommandPattern
 from .pedals.reader import DEFAULT_SEQUENCE_MS, DEFAULT_TAP_MS
 from .text import normalize, to_ascii
@@ -1663,6 +1663,17 @@ def _check_mode_target(target: str, settings: AppSettings, *, where: str) -> Non
     raise ConfigError(f"{where} switches to {target!r}, which is not {what}. Known modes: {known}.")
 
 
+def _check_lock(argument: str, settings: AppSettings, *, where: str) -> None:
+    """Reject a lock(...) that leaves open a mode the voice layer could never enter."""
+    for name in parse_names(argument):
+        if name not in settings.modes and settings.mode_named(spoken_phrase(name)) is None:
+            known = ", ".join(sorted(settings.modes))
+            raise ConfigError(
+                f"{where} has lock({argument}): {name!r} is not a runnable mode. "
+                f"Known modes: {known}."
+            )
+
+
 def _check_typeable(text: str, *, where: str) -> None:
     """Reject a literal type() the keyboard cannot produce."""
     missing = untypeable(to_ascii(text))
@@ -1737,6 +1748,8 @@ def _check_response(expanded: str, settings: AppSettings, *, where: str) -> None
             _check_hud(token.argument, where=where)
         if isinstance(token, VerbToken) and token.verb in ("sleep", "wake"):
             _check_sleep(token.argument, where=where, verb=token.verb)
+        if isinstance(token, VerbToken) and token.verb == "lock":
+            _check_lock(token.argument, settings, where=where)
 
 
 def parse_settings(

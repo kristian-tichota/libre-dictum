@@ -19,6 +19,7 @@ Feature: Commands from other programs
         "modes": {
           "command mode": { "type": "vosk", "path": "models/small-en" },
           "mouse mode": { "type": "vosk", "path": "models/small-en" },
+          "dictate mode": { "type": "transformer", "model_name": "whisper-turbo" },
           "break pedals": { "pedals": { "right": "space" } }
         }
       }
@@ -77,6 +78,23 @@ Feature: Commands from other programs
       When a program sends "break unlocked"
       And I say "mouse mode"
       Then the voice layer is in "mouse mode"
+
+    @accessibility-critical
+    Scenario: A mode the lock leaves open takes the voice layer alone, and back
+      # Dictation has to stay reachable over a program that covers the screen.
+      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
+      And a program sends "break open"
+      When I say "dictate mode"
+      Then the voice layer is in "dictate mode"
+      And the pedal layer is in "break pedals"
+      When the voice layer runs "mode(previous mode)"
+      Then the voice layer is in "command mode"
+      And the pedal layer is in "break pedals"
+
+    Scenario: A mode the lock leaves open must be runnable
+      Given the control command "go" is mapped to "lock(nonsense)"
+      When the configuration is loaded
+      Then loading fails with an error naming "not a runnable mode"
 
     @accessibility-critical
     Scenario: A reload lifts the lock

@@ -64,7 +64,7 @@ class InputExecutor:
         backend: InputBackend,
         *,
         mode_switcher: Callable[[str, bool], None] | None = None,
-        locker: Callable[[bool], None] | None = None,
+        locker: Callable[[bool, str], None] | None = None,
         on_held_change: Callable[[HeldInput], None] | None = None,
         display: Callable[[str], None] | None = None,
         recenter: Callable[[], None] | None = None,
@@ -299,18 +299,19 @@ class InputExecutor:
         self._sleeper(argument, asleep, self._origin, self._from_program)
 
     def _verb_lock(self, argument: str) -> None:
-        """Leave mode switches to programs alone."""
-        self._set_lock(True)
+        """Leave mode switches to programs, except into the modes argument names and back."""
+        self._set_lock(True, argument)
 
     def _verb_unlock(self, argument: str) -> None:
         """Let every mechanism switch modes again."""
-        self._set_lock(False)
+        self._set_lock(False, "")
 
-    def _set_lock(self, locked: bool) -> None:
+    def _set_lock(self, locked: bool, argument: str) -> None:
         if self._locker is None:
-            logger.warning("%slock() ignored: no mode lock is wired up", "" if locked else "un")
+            verb = "lock" if locked else "unlock"
+            logger.warning("%s(%s) ignored: no mode lock is wired up", verb, argument)
             return
-        self._locker(locked)
+        self._locker(locked, argument)
 
     def _verb_recenter(self, argument: str) -> None:
         """Take the head's current pose as the pointer's neutral."""

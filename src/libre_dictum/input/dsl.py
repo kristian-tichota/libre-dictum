@@ -60,7 +60,7 @@ ACTION_VERBS = frozenset(
 
 AWAKE_VERBS = frozenset({"sleep", "wake", "hud"})
 
-NILADIC_VERBS = frozenset({"recenter", "lock", "unlock"})
+NILADIC_VERBS = frozenset({"recenter", "unlock"})
 
 HUD_TARGETS = {
     "chip": "show or hide the chip",

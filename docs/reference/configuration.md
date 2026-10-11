@@ -186,7 +186,8 @@ Other programs run named commands over a unix socket that only this user can ope
 `control.commands` run. A command runs while a mechanism sleeps, because no mechanism sent it,
 and its own `sleep(...)` or `wake(...)` applies at once, whoever owns the sleep. A command that
 runs `lock()` keeps the layers where the program put them: until a command runs `unlock()` or a
-reload, every mode switch that voice, a gesture or a pedal asks for is refused and logged.
+reload, every mode switch that voice, a gesture or a pedal asks for is refused and logged, except
+into a mode `lock(...)` names and back out of it, which moves the voice layer alone.
 
 ```json
 "enable_control": true,

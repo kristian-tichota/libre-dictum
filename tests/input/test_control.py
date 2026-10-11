@@ -13,7 +13,7 @@ from libre_dictum.app import Application
 from libre_dictum.control import protocol
 from libre_dictum.control.send import main, send
 from libre_dictum.control.service import ControlService
-from libre_dictum.errors import ProtocolError
+from libre_dictum.errors import ConfigError, ProtocolError
 from libre_dictum.layers import Layer
 from libre_dictum.settings import parse_settings
 from tests.conftest import FakeStream
@@ -30,11 +30,13 @@ CONFIG = {
             "break woke": "wake() + mode(pedal:break pedals)",
             "break locked": "lock() + mode(pedal:break pedals)",
             "break unlocked": "unlock() + mode(pedal:voice)",
+            "break open": "lock(dictate mode) + mode(pedal:break pedals)",
         }
     },
     "modes": {
         "command mode": {"type": "vosk", "path": "m"},
         "mouse mode": {"type": "vosk", "path": "m"},
+        "dictate mode": {"type": "vosk", "path": "m"},
         "break pedals": {"pedals": {"right": "space"}},
     },
 }
@@ -174,6 +176,41 @@ class TestTheLock:
         app.dispatcher.handle("mouse mode")
 
         assert app.modes.active == "mouse mode"
+
+    def test_a_mode_it_leaves_open_takes_the_voice_layer_alone(self, running, socket_path):
+        app = running()
+        send("break open", socket_path)
+
+        app.dispatcher.handle("dictate mode")
+
+        assert app.modes.active == "dictate mode"
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_the_way_back_out_of_it_is_open_too(self, running, socket_path):
+        app = running()
+        send("break open", socket_path)
+        app.dispatcher.handle("dictate mode")
+
+        app.executor.execute("mode(previous mode)", origin=Layer.VOICE)
+
+        assert app.modes.active == "command mode"
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_no_other_mode_is_reached_through_it(self, running, socket_path):
+        app = running()
+        send("break open", socket_path)
+        app.dispatcher.handle("dictate mode")
+
+        app.dispatcher.handle("mouse mode")
+
+        assert app.modes.active == "dictate mode"
+
+    def test_a_mode_it_leaves_open_must_be_runnable(self, config_dir):
+        commands = {"go": "lock(nonsense)"}
+        config = {**CONFIG, "control": {"commands": commands}}
+
+        with pytest.raises(ConfigError, match="'nonsense' is not a runnable mode"):
+            parse_settings(config, config_dir)
 
     def test_a_reload_lifts_it(self, running, socket_path):
         app = running()

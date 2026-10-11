@@ -111,12 +111,12 @@ class TestModeSwitch:
 
 class TestLockAndUnlock:
     def test_they_set_and_lift_the_lock(self, backend):
-        locked: list[bool] = []
-        executor = InputExecutor(backend, locker=locked.append)
+        locked: list[tuple[bool, str]] = []
+        executor = InputExecutor(backend, locker=lambda *call: locked.append(call))
 
-        executor.execute("lock() + unlock()")
+        executor.execute("lock(dictate mode) + unlock()")
 
-        assert locked == [True, False]
+        assert locked == [(True, "dictate mode"), (False, "")]
 
     def test_without_a_lock_it_is_reported(self, executor, caplog):
         executor.execute("lock()")

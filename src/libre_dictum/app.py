@@ -17,7 +17,15 @@ from .health import FaultIndicator, Health, HealthMonitor
 from .input.devices import InputBackend, UinputBackend
 from .input.dsl import runnable_while_asleep
 from .input.executor import InputExecutor
-from .layers import Confirmation, Layer, LayerState, SleepSwitch, SleepView, parse_layers
+from .layers import (
+    Confirmation,
+    Layer,
+    LayerState,
+    SleepSwitch,
+    SleepView,
+    parse_layers,
+    parse_names,
+)
 from .meters import GestureMeter, HandReading
 from .modes import ModeIndicator, ModeManager
 from .overlay import model
@@ -371,8 +379,8 @@ class Application:
     def _switch_mode(self, name: str, from_program: bool) -> None:
         self.modes.switch(name, from_program)
 
-    def _lock_modes(self, locked: bool) -> None:
-        self.modes.lock(locked)
+    def _lock_modes(self, locked: bool, argument: str) -> None:
+        self.modes.lock(locked, parse_names(argument))
 
     def _on_control(self, request: str) -> str | None:
         """Run the response another program asked for by name, or say why not."""

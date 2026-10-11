@@ -160,6 +160,9 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     screen sets the layouts its surface needs, and one misfired gesture or misheard mode name would
     otherwise leave the user in a mode that binds nothing for it. While locked, a bare mode name,
     the previous-mode phrase and every `mode()` a mechanism runs are refused; a control command's
-    `mode()` still runs, because the program owns the layouts. Sleep is not gated, because it
+    `mode()` still runs, because the program owns the layouts. `lock(dictate mode)` leaves that
+    mode open: a mechanism may move the voice layer alone into it and back to where it came from,
+    so dictation stays reachable while the program's pedal and gesture layouts hold. Sleep is not
+    gated, because it
     already takes two requests. A reload lifts the lock, so that a program that died while locked
     cannot make the lock permanent.
