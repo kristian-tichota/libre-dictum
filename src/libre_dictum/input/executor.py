@@ -63,7 +63,8 @@ class InputExecutor:
         self,
         backend: InputBackend,
         *,
-        mode_switcher: Callable[[str], None] | None = None,
+        mode_switcher: Callable[[str, bool], None] | None = None,
+        locker: Callable[[bool], None] | None = None,
         on_held_change: Callable[[HeldInput], None] | None = None,
         display: Callable[[str], None] | None = None,
         recenter: Callable[[], None] | None = None,
@@ -72,6 +73,7 @@ class InputExecutor:
     ) -> None:
         self._backend = backend
         self._mode_switcher = mode_switcher
+        self._locker = locker
         self._on_held_change = on_held_change
         self._display = display
         self._recenter = recenter
@@ -96,6 +98,8 @@ class InputExecutor:
             "recenter": self._verb_recenter,
             "sleep": self._verb_sleep,
             "wake": self._verb_wake,
+            "lock": self._verb_lock,
+            "unlock": self._verb_unlock,
         }
 
     def execute(
@@ -269,7 +273,7 @@ class InputExecutor:
         if self._mode_switcher is None:
             logger.warning("mode(%s) ignored: no mode switcher is wired up", argument)
             return
-        self._mode_switcher(argument)
+        self._mode_switcher(argument, self._from_program)
 
     def _verb_hud(self, argument: str) -> None:
         """Ask the on-screen display to show something."""
@@ -293,6 +297,20 @@ class InputExecutor:
             logger.warning("%s(%s) ignored: no sleep switch is wired up", verb, argument)
             return
         self._sleeper(argument, asleep, self._origin, self._from_program)
+
+    def _verb_lock(self, argument: str) -> None:
+        """Leave mode switches to programs alone."""
+        self._set_lock(True)
+
+    def _verb_unlock(self, argument: str) -> None:
+        """Let every mechanism switch modes again."""
+        self._set_lock(False)
+
+    def _set_lock(self, locked: bool) -> None:
+        if self._locker is None:
+            logger.warning("%slock() ignored: no mode lock is wired up", "" if locked else "un")
+            return
+        self._locker(locked)
 
     def _verb_recenter(self, argument: str) -> None:
         """Take the head's current pose as the pointer's neutral."""

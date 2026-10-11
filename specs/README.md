@@ -156,3 +156,10 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     the program that asked for it. Its own `sleep` or `wake` applies at once and whoever owns the
     sleep, because a request no mechanism sent cannot be a misread, and a program that covers the
     screen would otherwise leave the user with no way back.
+32. **A program may lock the mode switches, and a reload lifts the lock.** A program that covers the
+    screen sets the layouts its surface needs, and one misfired gesture or misheard mode name would
+    otherwise leave the user in a mode that binds nothing for it. While locked, a bare mode name,
+    the previous-mode phrase and every `mode()` a mechanism runs are refused; a control command's
+    `mode()` still runs, because the program owns the layouts. Sleep is not gated, because it
+    already takes two requests. A reload lifts the lock, so that a program that died while locked
+    cannot make the lock permanent.

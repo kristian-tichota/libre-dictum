@@ -143,6 +143,7 @@ class Application:
         self.executor = InputExecutor(
             backend,
             mode_switcher=self._switch_mode,
+            locker=self._lock_modes,
             sleeper=self._request_sleep,
             on_held_change=self._on_held,
             display=self._on_hud,
@@ -367,8 +368,11 @@ class Application:
         if self.hud is not None:
             _tell(DISPLAY_SUBSYSTEM, partial(self.hud.set_partial, partial_text))
 
-    def _switch_mode(self, name: str) -> None:
-        self.modes.switch(name)
+    def _switch_mode(self, name: str, from_program: bool) -> None:
+        self.modes.switch(name, from_program)
+
+    def _lock_modes(self, locked: bool) -> None:
+        self.modes.lock(locked)
 
     def _on_control(self, request: str) -> str | None:
         """Run the response another program asked for by name, or say why not."""

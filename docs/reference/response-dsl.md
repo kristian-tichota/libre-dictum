@@ -31,6 +31,7 @@ Anything left down is shown on the tray and the chip. The key names are the alph
 | `type(text)` | One key code per character. |
 | `hud(target)` | Accepts `chip`, `sheet`, `open`, `close`, `modes`, `pedals`, `gestures`, `meters` and `group:<name>`. Checked at load, where a misspelling lists the alternatives, although `group:` produces only a warning, because deleting one command merges a two-command family into `misc`. With no display running the verb warns and the rest of the response still runs. |
 | `sleep(layers)` / `wake(layers)` | An empty argument means all three mechanisms. Both require confirmation and are deterministic, so a repeated request has no effect. See [Sleep](configuration.md#sleep). |
+| `lock()` / `unlock()` | While locked, a bare mode name, the previous-mode phrase and every `mode()` a mechanism runs are refused; a control command's `mode()` still runs. A reload unlocks. See [Control](configuration.md#control). |
 | `recenter()` | Makes the current pose neutral. It takes no argument and is inert under the absolute pointer law. |
 
 **`type()` deliberately does not use the clipboard.** No paste chord is portable: `ctrl + v` is

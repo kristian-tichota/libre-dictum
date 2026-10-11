@@ -18,6 +18,7 @@ Feature: Commands from other programs
         },
         "modes": {
           "command mode": { "type": "vosk", "path": "models/small-en" },
+          "mouse mode": { "type": "vosk", "path": "models/small-en" },
           "break pedals": { "pedals": { "right": "space" } }
         }
       }
@@ -47,6 +48,42 @@ Feature: Commands from other programs
       And the pedals put every mechanism to sleep
       When a program sends "break started"
       Then nothing is asleep
+
+  @design-decision
+  Rule: A program can lock the mode switches
+
+    While locked, every switch a mechanism asks for is refused and a program's still runs, so
+    the layouts a program set stay set until it changes them (decision 32).
+
+    Background:
+      Given the control command "break locked" is mapped to "lock() + mode(pedal:break pedals)"
+      And the control command "break unlocked" is mapped to "unlock() + mode(pedal:voice)"
+      And a program sends "break locked"
+
+    Scenario: A spoken mode name switches nothing
+      When I say "mouse mode"
+      Then the voice layer is in "command mode"
+      And the pedal layer is in "break pedals"
+
+    Scenario: A gesture's switch is refused
+      When the gesture "smile" is mapped to "mode(mouse mode)" and fires
+      Then the voice layer is in "command mode"
+
+    Scenario: A program still moves the layers
+      When a program sends "break over"
+      Then the pedal layer is in "command mode"
+
+    Scenario: Unlocking lets every mechanism switch again
+      When a program sends "break unlocked"
+      And I say "mouse mode"
+      Then the voice layer is in "mouse mode"
+
+    @accessibility-critical
+    Scenario: A reload lifts the lock
+      # A program that dies while locked would otherwise leave the lock for ever.
+      When I say "reload config"
+      And I say "mouse mode"
+      Then the voice layer is in "mouse mode"
 
   Rule: Anything else is refused
 

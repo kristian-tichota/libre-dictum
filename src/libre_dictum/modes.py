@@ -54,6 +54,7 @@ class ModeManager:
         self.settings = settings
         self._layer: dict[Layer, str | None] = dict.fromkeys(Layer, None)
         self._before: dict[Layer, str | None] = dict.fromkeys(Layer, None)
+        self.locked = False
 
         self._executor = executor
         self._on_text = on_text
@@ -172,10 +173,20 @@ class ModeManager:
             pedal=self._layer[Layer.PEDAL] if self.settings.pedal else None,
         )
 
-    def switch(self, name: str) -> None:
-        """Move whichever layers name asks for."""
+    def lock(self, locked: bool) -> None:
+        """Refuse every switch but a program's while locked."""
+        with self._lock:
+            if locked != self.locked:
+                logger.info("Mode switches are %s", "locked" if locked else "unlocked")
+            self.locked = locked
+
+    def switch(self, name: str, from_program: bool = False) -> None:
+        """Move whichever layers name asks for, unless locked against all but programs."""
         layer, target = parse_target(name)
         with self._lock:
+            if self.locked and not from_program:
+                logger.warning("Switching to %r refused: mode switches are locked", name)
+                return
             if layer is Layer.VOICE:
                 self._switch_voice(target)
             elif layer is not None:
@@ -307,6 +318,7 @@ class ModeManager:
             self._executor.clear_saved()
 
             previous_settings, self.settings = self.settings, settings
+            self.lock(False)
 
             for name in set(self._streams) - set(settings.modes):
                 logger.info("Mode %r was removed", name)

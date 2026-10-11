@@ -71,8 +71,7 @@ class CommandDispatcher:
         sleeping = self._asleep()
 
         if not sleeping and lowered == settings.previous_mode_keyword:
-            self._report(utterance, matched=lowered)
-            self._modes.switch(lowered)
+            self._switch(utterance, lowered)
             return
 
         named = settings.mode_named(lowered)
@@ -81,8 +80,7 @@ class CommandDispatcher:
                 logger.debug("The voice layer is asleep; %r does not switch", utterance)
                 self._report(utterance)
                 return
-            self._report(utterance, matched=named)
-            self._modes.switch(named)
+            self._switch(utterance, named)
             return
 
         if self._display is not None:
@@ -133,6 +131,15 @@ class CommandDispatcher:
             return
 
         self._report_near_miss(utterance, mode)
+
+    def _switch(self, utterance: str, target: str) -> None:
+        """Switch to target, unless mode switches are locked."""
+        if self._modes.locked:
+            logger.info("Mode switches are locked; %r does not switch", utterance)
+            self._report(utterance)
+            return
+        self._report(utterance, matched=target)
+        self._modes.switch(target)
 
     def _report_near_miss(self, utterance: str, mode: ModeSettings) -> None:
         """Say that nothing matched, and name the pattern that came closest."""

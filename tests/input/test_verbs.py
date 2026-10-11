@@ -95,15 +95,33 @@ class TestScript:
 
 class TestModeSwitch:
     def test_mode_calls_the_switcher(self, backend):
-        switched: list[str] = []
-        executor = InputExecutor(backend, mode_switcher=switched.append, sleep=lambda _: None)
+        switched: list[tuple[str, bool]] = []
+        executor = InputExecutor(
+            backend, mode_switcher=lambda *call: switched.append(call), sleep=lambda _: None
+        )
 
         executor.execute("mode(dictate mode)")
-        assert switched == ["dictate mode"]
+        executor.execute("mode(command mode)", from_program=True)
+        assert switched == [("dictate mode", False), ("command mode", True)]
 
     def test_mode_without_a_switcher_is_reported(self, executor, caplog):
         executor.execute("mode(dictate mode)")
         assert "mode switcher" in caplog.text
+
+
+class TestLockAndUnlock:
+    def test_they_set_and_lift_the_lock(self, backend):
+        locked: list[bool] = []
+        executor = InputExecutor(backend, locker=locked.append)
+
+        executor.execute("lock() + unlock()")
+
+        assert locked == [True, False]
+
+    def test_without_a_lock_it_is_reported(self, executor, caplog):
+        executor.execute("lock()")
+
+        assert "mode lock" in caplog.text
 
 
 class TestSleepAndWake:

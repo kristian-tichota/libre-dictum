@@ -15,7 +15,7 @@ _REPEAT_RE = re.compile(r"(\d+)\(([^()]*)\)")
 _TOKEN_SEPARATOR_RE = re.compile(r"(?<!\\)\+")
 
 _VERB_RE = re.compile(
-    r"(script|python|exec|mode|hold|release|toggle|save|type|hud|recenter|sleep|wake)\((.*)\)",
+    r"(script|python|exec|mode|hold|release|toggle|save|type|hud|recenter|sleep|wake|lock|unlock)\((.*)\)",
     re.DOTALL,
 )
 
@@ -42,12 +42,25 @@ KEY_VERBS: dict[str, KeyAction] = {
 }
 
 ACTION_VERBS = frozenset(
-    {"script", "python", "exec", "mode", "save", "type", "hud", "recenter", "sleep", "wake"}
+    {
+        "script",
+        "python",
+        "exec",
+        "mode",
+        "save",
+        "type",
+        "hud",
+        "recenter",
+        "sleep",
+        "wake",
+        "lock",
+        "unlock",
+    }
 )
 
 AWAKE_VERBS = frozenset({"sleep", "wake", "hud"})
 
-NILADIC_VERBS = frozenset({"recenter"})
+NILADIC_VERBS = frozenset({"recenter", "lock", "unlock"})
 
 HUD_TARGETS = {
     "chip": "show or hide the chip",

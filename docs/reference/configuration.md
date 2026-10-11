@@ -184,7 +184,9 @@ other, not both. A release the device still owes completes nothing.
 Other programs run named commands over a unix socket that only this user can open:
 `$XDG_RUNTIME_DIR/libre-dictum/control.sock`, or `$LIBRE_DICTUM_CONTROL_SOCKET`. Only the names in
 `control.commands` run. A command runs while a mechanism sleeps, because no mechanism sent it,
-and its own `sleep(...)` or `wake(...)` applies at once, whoever owns the sleep.
+and its own `sleep(...)` or `wake(...)` applies at once, whoever owns the sleep. A command that
+runs `lock()` keeps the layers where the program put them: until a command runs `unlock()` or a
+reload, every mode switch that voice, a gesture or a pedal asks for is refused and logged.
 
 ```json
 "enable_control": true,

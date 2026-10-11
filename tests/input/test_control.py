@@ -28,6 +28,8 @@ CONFIG = {
             "break over": "mode(pedal:voice)",
             "say hi": "type(hi)",
             "break woke": "wake() + mode(pedal:break pedals)",
+            "break locked": "lock() + mode(pedal:break pedals)",
+            "break unlocked": "unlock() + mode(pedal:voice)",
         }
     },
     "modes": {
@@ -133,6 +135,54 @@ class TestADeclaredName:
 
         assert replies(socket_path, b"break started\nsay hi\n") == b"ok\nok\n"
         assert app.backend.sequence == "h↓ h↑ i↓ i↑"
+
+
+class TestTheLock:
+    def test_a_spoken_mode_name_switches_nothing_and_says_so(self, running, socket_path):
+        app = running()
+        heard: list = []
+        app.dispatcher._on_heard = heard.append
+        send("break locked", socket_path)
+
+        app.dispatcher.handle("mouse mode")
+
+        assert app.modes.active == "command mode"
+        assert [report.matched for report in heard] == [None]
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_a_mechanism_s_switch_is_refused(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+
+        app.executor.execute("mode(pedal:voice)", origin=Layer.GESTURE)
+
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_a_program_still_moves_the_layers(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+
+        send("break over", socket_path)
+
+        assert app.modes.layer_state().pedal == "command mode"
+
+    def test_unlock_lets_every_mechanism_switch_again(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+        send("break unlocked", socket_path)
+
+        app.dispatcher.handle("mouse mode")
+
+        assert app.modes.active == "mouse mode"
+
+    def test_a_reload_lifts_it(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+
+        app.reload()
+        app.dispatcher.handle("mouse mode")
+
+        assert app.modes.active == "mouse mode"
 
 
 class TestAnythingElse:
