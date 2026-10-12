@@ -35,6 +35,7 @@ whisper = ["openai-whisper"]
 transformers = [
   "transformers",
   "accelerate",
+  "librosa",
 ]
 system-tray = [
   "pystray",
