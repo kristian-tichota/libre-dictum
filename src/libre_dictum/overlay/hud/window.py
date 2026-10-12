@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import dataclasses
 import logging
 import math
 import os
@@ -237,7 +238,11 @@ class ChipSurface(Surface):
         for widget in (self._hearing, self._utterance):
             heard.append(widget)
 
-        self._bars: tuple[tuple[float, bool], ...] = ()
+        self._animate = animate
+        self._tape = motion.Tape(render.WAVE_WIDTH, glide=animate)
+        self._chip: render.Chip | None = None
+        self._heard_at = 0.0
+        self._gliding = False
         self._wave = Gtk.DrawingArea()
         self._wave.set_hexpand(True)
         size = style.clamp(scale, style.MIN_SCALE, style.MAX_SCALE)
@@ -290,12 +295,53 @@ class ChipSurface(Surface):
         self._hearing.set_text(chip.mark)
         self._utterance.set_text(chip.partial or chip.utterance)
         _classify(self._utterance, "miss", chip.missed and not chip.hearing)
-        listening = chip.microphone is not None
-        if chip.wave != self._bars:
-            self._bars = chip.wave
+        self._listen(chip)
+        self._fault.set_text(chip.fault or "")
+        self._fault.set_visible(chip.fault is not None)
+        self._note.set_text(chip.note or "")
+        self._note.set_visible(chip.note is not None)
+        self.window.set_tooltip_text(chip.tooltip() or None)
+
+    def _listen(self, chip: render.Chip) -> None:
+        """Take a new microphone reading, if this is one, and keep its tape moving."""
+        microphone = chip.microphone
+        known = self._chip.microphone if self._chip is not None else None
+        self._chip = chip
+        if microphone != known:
+            self._heard_at = _milliseconds()
+            if microphone is None:
+                self._tape.clear()
+            else:
+                self._tape.feed(
+                    chip.wave,
+                    heard=microphone.heard,
+                    period=microphone.period * 1000.0,
+                    now=self._heard_at,
+                )
             self._wave.queue_draw()
-        self._wave.set_visible(listening)
-        self._countdown.set_visible(listening)
+        self._wave.set_visible(microphone is not None)
+        self._countdown.set_visible(microphone is not None)
+        self._count(chip)
+        if microphone is not None and self._animate and not self._gliding:
+            self._gliding = True
+            self.window.add_tick_callback(self._glide)
+
+    def _glide(self, _widget: Any, clock: Any) -> bool:
+        """One frame of the wave scrolling and the countdown draining."""
+        chip = self._chip
+        if chip is None or chip.microphone is None:
+            self._gliding = False
+            return GLib.SOURCE_REMOVE
+        now = clock.get_frame_time() / 1000.0
+        head = self._tape.head
+        if self._tape.advance(now) != head:
+            self._wave.queue_draw()
+        later = chip.microphone.after((now - self._heard_at) / 1000.0)
+        self._count(dataclasses.replace(chip, microphone=later))
+        return GLib.SOURCE_CONTINUE
+
+    def _count(self, chip: render.Chip) -> None:
+        """The quiet still allowed, as a bar and as a number."""
         remaining = chip.remaining
         self._patience.set_visible(remaining is not None)
         self._patience.set_fraction(remaining or 0.0)
@@ -303,11 +349,6 @@ class ChipSurface(Surface):
         self._left.set_xalign(1.0 if remaining is not None else 0.0)
         _classify(self._left, style.TONE_LIVE, chip.counting)
         _classify(self._left, style.TONE_IDLE, not chip.counting)
-        self._fault.set_text(chip.fault or "")
-        self._fault.set_visible(chip.fault is not None)
-        self._note.set_text(chip.note or "")
-        self._note.set_visible(chip.note is not None)
-        self.window.set_tooltip_text(chip.tooltip() or None)
 
     def _paint_wave(self, _area: Any, context: Any, width: int, height: int) -> None:
         """The levels as bars mirrored about the middle, newest on the right."""
@@ -319,9 +360,8 @@ class ChipSurface(Surface):
         middle = height / 2
         context.set_line_width(thickness)
         context.set_line_cap(cairo.LINE_CAP_ROUND)
-        start = render.WAVE_WIDTH - len(self._bars)
-        for index, (level, loud) in enumerate(self._bars):
-            x = (start + index + 0.5) * pitch
+        for age, level, loud in self._tape.placed():
+            x = width - age * pitch
             context.set_source_rgba(*(style.WAVE_LOUD if loud else style.WAVE_QUIET))
             context.move_to(x, middle - level * reach)
             context.line_to(x, middle + level * reach)

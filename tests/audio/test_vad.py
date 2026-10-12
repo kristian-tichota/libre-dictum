@@ -133,6 +133,22 @@ class TestTheMicrophoneGauge:
 
         assert gauge.reading().levels == (loudness(0.5),) * 4
 
+    def test_every_level_is_counted_after_it_is_dropped(self):
+        _, gauge = self.gauge()
+        for block in (QUIET, QUIET, LOUD):
+            gauge.hear(block)
+
+        reading = gauge.reading()
+
+        assert (len(reading.levels), reading.heard, reading.period) == (4, 6, 0.05)
+
+    def test_a_reset_counts_from_nothing(self):
+        _, gauge = self.gauge()
+        gauge.hear(LOUD)
+        gauge.reset()
+
+        assert gauge.reading().heard == 0
+
     def test_the_gate_is_the_threshold_on_the_same_scale(self):
         _, gauge = self.gauge(energy_threshold=0.01)
 

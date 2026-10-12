@@ -298,6 +298,29 @@ class TestTheMicrophoneOnTheChip:
         assert (chip.countdown, chip.remaining) == (render.TRANSCRIBING, None)
         assert chip.counting
 
+    def test_quiet_keeps_draining_between_readings(self):
+        reading = Microphone(recording=True, quiet=0.5, patience=2.0).after(0.3)
+
+        assert reading.left == pytest.approx(1.2)
+
+    def test_a_frame_timed_before_the_reading_drains_nothing(self):
+        microphone = Microphone(recording=True, quiet=0.5, patience=2.0)
+
+        assert microphone.after(-0.01) == microphone
+
+    @pytest.mark.parametrize(
+        "reading",
+        [
+            {"recording": True, "quiet": 0.0},
+            {"recording": False, "quiet": 0.5},
+            {"recording": True, "quiet": 0.5, "transcribing": True},
+        ],
+    )
+    def test_nothing_drains_while_speaking_waiting_or_transcribing(self, reading):
+        microphone = Microphone(patience=2.0, **reading)
+
+        assert microphone.after(0.3) == microphone
+
 
 class TestWhenTheSheetDraws:
     def test_not_at_all_while_it_is_closed(self, catalogue):

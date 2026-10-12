@@ -268,7 +268,9 @@ _NON_DEFAULT: dict[str, object] = {
     "page": "modes",
     "group": "focus",
     "held_gestures": ("fist",),
-    "microphone": Microphone(levels=(0.25, 0.5), gate=0.4, recording=True, quiet=0.5, patience=2),
+    "microphone": Microphone(
+        levels=(0.25, 0.5), gate=0.4, recording=True, quiet=0.5, patience=2, heard=9, period=0.05
+    ),
 }
 
 
@@ -416,7 +418,13 @@ class TestTheReadingsSurviveTheWire:
 
     def test_a_dictation_reading_comes_back_intact(self):
         microphone = Microphone(
-            levels=(0.1, 0.62, 0.3), gate=0.4, recording=True, quiet=0.7, patience=2.0
+            levels=(0.1, 0.62, 0.3),
+            gate=0.4,
+            recording=True,
+            quiet=0.7,
+            patience=2.0,
+            heard=41,
+            period=0.05,
         )
         state = protocol.state_of(model.Snapshot(microphone=microphone), revision=3)
 

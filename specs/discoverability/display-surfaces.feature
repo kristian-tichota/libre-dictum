@@ -196,6 +196,7 @@ Feature: Showing what the session is doing, in a process of its own
       And the app is running
       When audio arrives
       Then the chip draws its recent loudness, marking what reaches the energy threshold
+      And the loudness scrolls on every display frame, at the pace it was heard
       And the chip says "no voice navigation in this mode"
 
     @transformer
@@ -204,6 +205,7 @@ Feature: Showing what the session is doing, in a process of its own
       And a recording is in progress
       When 1.5 seconds of silence pass
       Then the chip shows 0.5 seconds left, as a bar and as a number
+      And the bar drains on every display frame between two readings
       When the chunk is flushed
       Then the chip says it is transcribing until the text arrives
 

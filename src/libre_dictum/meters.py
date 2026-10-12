@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 ABSENT = "--"
 
@@ -126,6 +126,8 @@ class Microphone:
     quiet: float = 0.0
     patience: float = 0.0
     transcribing: bool = False
+    heard: int = 0
+    period: float = 0.0
 
     @property
     def left(self) -> float:
@@ -136,6 +138,12 @@ class Microphone:
     def remaining(self) -> float:
         """left as a fraction of patience: 1.0 while speaking, 0.0 as the utterance is sent."""
         return _unit(self.left / self.patience) if self.patience > 0.0 else 0.0
+
+    def after(self, seconds: float) -> Microphone:
+        """This reading seconds later, if the quiet it is counting goes on."""
+        if not self.recording or self.transcribing or self.quiet <= 0.0:
+            return self
+        return replace(self, quiet=self.quiet + max(0.0, seconds))
 
 
 def _unit(value: float) -> float:
