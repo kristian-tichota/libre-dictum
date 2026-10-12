@@ -210,7 +210,14 @@ def _swatch(colour: tuple[int, int, int] | None) -> Gtk.Label:
 class ChipSurface(Surface):
     """Mode, the other layers when they differ, held keys, hearing, the last utterance, faults."""
 
-    def __init__(self, shell: Any, *, anchor: str = "top-right", animate: bool = True) -> None:
+    def __init__(
+        self,
+        shell: Any,
+        *,
+        anchor: str = "top-right",
+        animate: bool = True,
+        scale: float = style.DEFAULT_SCALE,
+    ) -> None:
         super().__init__(shell, anchor=anchor, title=f"{compositor.APP_ID} chip")
         self._room = motion.Slide(duration=motion.DURATION_MS if animate else 0.0)
         self._ticking = False
@@ -230,6 +237,23 @@ class ChipSurface(Surface):
         for widget in (self._hearing, self._utterance):
             heard.append(widget)
 
+        self._bars: tuple[tuple[float, bool], ...] = ()
+        self._wave = Gtk.DrawingArea()
+        self._wave.set_hexpand(True)
+        size = style.clamp(scale, style.MIN_SCALE, style.MAX_SCALE)
+        self._wave.set_content_height(round(style.WAVE_HEIGHT * size))
+        self._wave.set_draw_func(self._paint_wave)
+
+        self._countdown = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._patience = Gtk.ProgressBar()
+        self._patience.add_css_class("countdown")
+        self._patience.set_hexpand(True)
+        self._patience.set_valign(Gtk.Align.CENTER)
+        self._left = _label("", "meter")
+        self._left.set_hexpand(True)
+        for widget in (self._patience, self._left):
+            self._countdown.append(widget)
+
         self._layers = _label("", "axis")
         self._gestures = _label("", "hearing")
         self._gestures.set_ellipsize(3)
@@ -242,6 +266,8 @@ class ChipSurface(Surface):
             self._sleep,
             self._gestures,
             heard,
+            self._wave,
+            self._countdown,
             self._fault,
             self._note,
         ):
@@ -264,11 +290,42 @@ class ChipSurface(Surface):
         self._hearing.set_text(chip.mark)
         self._utterance.set_text(chip.partial or chip.utterance)
         _classify(self._utterance, "miss", chip.missed and not chip.hearing)
+        listening = chip.microphone is not None
+        if chip.wave != self._bars:
+            self._bars = chip.wave
+            self._wave.queue_draw()
+        self._wave.set_visible(listening)
+        self._countdown.set_visible(listening)
+        remaining = chip.remaining
+        self._patience.set_visible(remaining is not None)
+        self._patience.set_fraction(remaining or 0.0)
+        self._left.set_text(chip.countdown)
+        self._left.set_xalign(1.0 if remaining is not None else 0.0)
+        _classify(self._left, style.TONE_LIVE, chip.counting)
+        _classify(self._left, style.TONE_IDLE, not chip.counting)
         self._fault.set_text(chip.fault or "")
         self._fault.set_visible(chip.fault is not None)
         self._note.set_text(chip.note or "")
         self._note.set_visible(chip.note is not None)
         self.window.set_tooltip_text(chip.tooltip() or None)
+
+    def _paint_wave(self, _area: Any, context: Any, width: int, height: int) -> None:
+        """The levels as bars mirrored about the middle, newest on the right."""
+        if cairo is None:
+            return
+        pitch = width / render.WAVE_WIDTH
+        thickness = max(1.0, pitch * 0.55)
+        reach = max(0.0, height - thickness) / 2
+        middle = height / 2
+        context.set_line_width(thickness)
+        context.set_line_cap(cairo.LINE_CAP_ROUND)
+        start = render.WAVE_WIDTH - len(self._bars)
+        for index, (level, loud) in enumerate(self._bars):
+            x = (start + index + 0.5) * pitch
+            context.set_source_rgba(*(style.WAVE_LOUD if loud else style.WAVE_QUIET))
+            context.move_to(x, middle - level * reach)
+            context.line_to(x, middle + level * reach)
+            context.stroke()
 
     def make_room(self, distance: float) -> None:
         """Ease the chip distance pixels clear of the sheet, or back again."""
@@ -481,7 +538,9 @@ class Hud:
         _install_style(opacity, scale)
 
         self.shell = Shell()
-        self.chip = ChipSurface(self.shell.usable, anchor=chip_anchor, animate=_animated())
+        self.chip = ChipSurface(
+            self.shell.usable, anchor=chip_anchor, animate=_animated(), scale=scale
+        )
         self.sheet = SheetSurface(
             self.shell.usable,
             anchor=sheet_anchor,

@@ -116,6 +116,28 @@ class HandReading:
         return tuple(zip(FINGERS, self.extension, strict=False))
 
 
+@dataclass(frozen=True, slots=True)
+class Microphone:
+    """What a dictation mode hears: recent loudness, its gate, and the quiet that ends a take."""
+
+    levels: tuple[float, ...] = ()
+    gate: float = 0.0
+    recording: bool = False
+    quiet: float = 0.0
+    patience: float = 0.0
+    transcribing: bool = False
+
+    @property
+    def left(self) -> float:
+        """Seconds of quiet still allowed before the utterance is sent."""
+        return max(0.0, self.patience - self.quiet)
+
+    @property
+    def remaining(self) -> float:
+        """left as a fraction of patience: 1.0 while speaking, 0.0 as the utterance is sent."""
+        return _unit(self.left / self.patience) if self.patience > 0.0 else 0.0
+
+
 def _unit(value: float) -> float:
     """Clamp to [0, 1], which a closeness promises."""
     return min(max(value, 0.0), 1.0) + 0.0

@@ -41,7 +41,7 @@ def session(executor, tmp_path):
             )
             self.manager.start()
 
-        def _factory(self, mode, settings, on_text, on_partial=None):
+        def _factory(self, mode, settings, on_text, on_partial=None, on_microphone=None):
             self.built.append(mode.name)
             self.streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
             return self.streams[mode.name]
@@ -186,7 +186,7 @@ class TestRecovery:
     def test_a_mode_that_failed_to_start_is_retried(self, executor, tmp_path):
         broken = {"root mode"}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             if mode.name in broken:
                 raise RuntimeError("model file vanished")
             return FakeStream(mode, settings, on_text, on_partial)

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from libre_dictum.app import Application, ModeDisplays
+from libre_dictum.meters import Microphone
 from libre_dictum.settings import parse_settings
 from tests.conftest import FakeIndicator, FakeStream
 from tests.overlay.conftest import DEADLINE_SECONDS, Display
@@ -58,8 +59,8 @@ def config_dir(tmp_path) -> Path:
 def app(backend, config_dir, socket_path):
     streams: dict[str, FakeStream] = {}
 
-    def factory(mode, settings, on_text, on_partial=None):
-        streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
+    def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
+        streams[mode.name] = FakeStream(mode, settings, on_text, on_partial, on_microphone)
         return streams[mode.name]
 
     application = Application(
@@ -204,6 +205,12 @@ class TestWhatReachesTheSocket:
 
         assert app.hud.state().partial == "buffer sa"
 
+    def test_a_dictation_reading_arrives_from_the_recognizer(self, app):
+        app.start()
+        app.streams["root mode"].on_microphone(Microphone(levels=(0.5,)))
+
+        assert app.hud.state().microphone == Microphone(levels=(0.5,))
+
     def test_a_partial_does_not_displace_the_last_utterance(self, app):
         app.start()
         app.streams["root mode"].on_text("buffer save")
@@ -239,7 +246,7 @@ class TestTheSocketAsASubsystem:
         application = Application(
             parse_settings(CONFIG, tmp_path),
             backend=backend,
-            stream_factory=lambda mode, settings, on_text, on_partial=None: FakeStream(
+            stream_factory=lambda mode, settings, on_text, on_partial=None, **_: FakeStream(
                 mode, settings, on_text, on_partial
             ),
             hud_socket=tmp_path / "afile" / "s.sock",
@@ -398,7 +405,7 @@ class TestSayingSomethingToTheDisplay:
 
         streams: dict[str, FakeStream] = {}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
             return streams[mode.name]
 
@@ -420,7 +427,7 @@ class TestSayingSomethingToTheDisplay:
 
         streams: dict[str, FakeStream] = {}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
             return streams[mode.name]
 
@@ -504,7 +511,7 @@ def test_a_display_that_connects_during_a_long_model_load_is_not_left_blank(
     """The socket opens before the models."""
     connected: list[Display] = []
 
-    def slow_factory(mode, settings, on_text, on_partial=None):
+    def slow_factory(mode, settings, on_text, on_partial=None, on_microphone=None):
         if not connected:
             connected.append(Display(socket_path))
         return FakeStream(mode, settings, on_text, on_partial)

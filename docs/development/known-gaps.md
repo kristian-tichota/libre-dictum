@@ -50,7 +50,8 @@ frame reads as one movement. The fourth is whether `set_monitor` remaps a surfac
 which is what confining the surfaces to one output rests on. An
 X11 display and a Python that has GTK4 drive everything around those four, `--outputs` included, and
 offer no layer shell to exercise them with. `--probe` is the substitute. Unexercised for the same
-reason: both `*_stream._process` calls to `_note_partial`, which need PortAudio, and the `EV_ABS`
+reason: both `*_stream._process` calls to `_note_partial` and the transformer stream's to
+`_note_microphone`, which need PortAudio, and the `EV_ABS`
 tablet, which needs `/dev/uinput`.
 
 ## Smaller defects

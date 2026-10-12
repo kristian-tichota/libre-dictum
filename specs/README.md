@@ -166,3 +166,8 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     gated, because it
     already takes two requests. A reload lifts the lock, so that a program that died while locked
     cannot make the lock permanent.
+33. **A dictation mode shows the chip whatever its toggle says.** A dictation mode has no partial,
+    so a level meter and a silence countdown are the only proof that it hears and the only sign of
+    when the utterance will be sent. The toggle itself is untouched, so the chip goes back off once
+    the voice layer leaves the mode, and a full sleep that takes the display (decision 30) still
+    takes it.

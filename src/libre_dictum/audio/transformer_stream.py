@@ -6,10 +6,11 @@ from collections.abc import Callable
 import numpy as np
 import sounddevice as sd
 
+from ..meters import Microphone
 from ..settings import TransformerSettings
 from .base import AudioStream
 from .transcriber import Transcriber, create_transcriber
-from .vad import VoiceActivityChunker
+from .vad import MicrophoneGauge, VoiceActivityChunker
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class TransformerStream(AudioStream):
         block_duration: float = 0.1,
         chunk_callback: Callable[[str], None] | None = None,
         partial_callback: Callable[[str | None], None] | None = None,
+        microphone_callback: Callable[[Microphone | None], None] | None = None,
         transcriber: Transcriber | None = None,
     ) -> None:
         super().__init__(
@@ -34,6 +36,7 @@ class TransformerStream(AudioStream):
             block_duration=block_duration,
             chunk_callback=chunk_callback,
             partial_callback=partial_callback,
+            microphone_callback=microphone_callback,
         )
         self.settings = settings
         self._transcriber = transcriber or create_transcriber(
@@ -47,6 +50,7 @@ class TransformerStream(AudioStream):
             energy_threshold=settings.energy_threshold,
             pre_roll_seconds=settings.pre_roll_seconds,
         )
+        self._gauge = MicrophoneGauge(self._chunker)
 
     def _open_stream(self) -> sd.InputStream:
         def on_audio(indata, frames, time_info, status) -> None:  # noqa: ANN001 - sd API
@@ -65,11 +69,15 @@ class TransformerStream(AudioStream):
     def _process(self, block: np.ndarray) -> None:
         chunk = self._chunker.push(block)
         self._note_partial("" if self._chunker.recording else None)
+        self._gauge.hear(block)
+        self._note_microphone(self._gauge.reading(transcribing=chunk is not None))
         if chunk is not None:
             self._transcribe(chunk)
+            self._note_microphone(self._gauge.reading())
 
     def _on_disabled(self) -> None:
         self._chunker.reset()
+        self._gauge.reset()
 
     def _transcribe(self, audio: np.ndarray) -> None:
         if audio.size == 0:

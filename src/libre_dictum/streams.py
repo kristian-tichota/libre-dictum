@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .overlay.model import navigation_phrases
 from .settings import AppSettings, ModeKind, ModeSettings, spoken_phrase
+
+if TYPE_CHECKING:
+    from .meters import Microphone
 
 
 @runtime_checkable
@@ -31,6 +34,7 @@ class StreamFactory(Protocol):
         settings: AppSettings,
         on_text: Callable[[str], None],
         on_partial: Callable[[str | None], None] | None = None,
+        on_microphone: Callable[[Microphone | None], None] | None = None,
     ) -> RecognitionStream: ...
 
 
@@ -62,6 +66,7 @@ def build_stream(
     settings: AppSettings,
     on_text: Callable[[str], None],
     on_partial: Callable[[str | None], None] | None = None,
+    on_microphone: Callable[[Microphone | None], None] | None = None,
 ) -> RecognitionStream:
     """Construct the recognizer for mode."""
     if mode.kind is ModeKind.VOSK:
@@ -85,4 +90,5 @@ def build_stream(
         name=mode.name,
         chunk_callback=on_text,
         partial_callback=on_partial,
+        microphone_callback=on_microphone,
     )

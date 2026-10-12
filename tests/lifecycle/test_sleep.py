@@ -65,7 +65,7 @@ def app(backend, tmp_path, monkeypatch):
     application = Application(
         parse_settings(CONFIG, tmp_path),
         backend=backend,
-        stream_factory=lambda mode, settings, on_text, on_partial=None: FakeStream(
+        stream_factory=lambda mode, settings, on_text, on_partial=None, **_: FakeStream(
             mode, settings, on_text, on_partial
         ),
     )

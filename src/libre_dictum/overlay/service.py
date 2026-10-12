@@ -12,7 +12,7 @@ from ..errors import ProtocolError
 from ..health import Health
 from ..input.dsl import hud_group
 from ..layers import LayerState, SleepView
-from ..meters import GestureMeter, HandReading
+from ..meters import GestureMeter, HandReading, Microphone
 from ..settings import OverlaySettings
 from ..sockets import listen_privately, staging_path
 from ..status import HeldInput
@@ -120,6 +120,7 @@ class HudService:
         self._held_gestures: tuple[str, ...] = ()
         self._meters: tuple[GestureMeter, ...] = ()
         self._hands: tuple[HandReading, ...] = ()
+        self._microphone: Microphone | None = None
         self._dot: protocol.CalibrationDot | None = None
         self._meters_on = True
         self._chip = chip
@@ -345,6 +346,12 @@ class HudService:
             self._partial = partial
         self._publish()
 
+    def set_microphone(self, microphone: Microphone | None) -> None:
+        """What a dictation mode hears right now, or None once no dictation mode is listening."""
+        with self._lock:
+            self._microphone = microphone
+        self._publish()
+
     @property
     def chip(self) -> bool:
         return self._chip
@@ -484,9 +491,11 @@ class HudService:
                 held_gestures=self._held_gestures,
                 meters=self._meters,
                 hands=self._hands,
+                microphone=self._microphone,
             ),
             revision=self._catalogue.revision,
-            chip=self._chip and (not self._dark or self._sleep.asking),
+            chip=(self._chip or self._microphone is not None)
+            and (not self._dark or self._sleep.asking),
             sheet=self._sheet.visible and not self._dark,
             page=str(self._sheet.page),
             dot=self._dot,

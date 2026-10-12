@@ -10,7 +10,7 @@ from ..errors import ConfigError
 from ..health import Health
 from ..input.dsl import VerbToken, apply_aliases, hud_group, validate_response
 from ..layers import Layer, LayerState, SleepView, parse_target
-from ..meters import GestureMeter, HandReading
+from ..meters import GestureMeter, HandReading, Microphone
 from ..settings import (
     AppSettings,
     Command,
@@ -551,6 +551,7 @@ class Snapshot:
     held_gestures: tuple[str, ...] = ()
     meters: tuple[GestureMeter, ...] = ()
     hands: tuple[HandReading, ...] = ()
+    microphone: Microphone | None = None
 
 
 class Page(StrEnum):

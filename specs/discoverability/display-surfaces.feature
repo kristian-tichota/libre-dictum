@@ -172,16 +172,16 @@ Feature: Showing what the session is doing, in a process of its own
 
     Scenario: A partial is what proves the microphone is alive
       # A growing partial is something no dead capture thread can produce, which is why
-      # there is no separate level meter.
+      # a command mode has no separate level meter.
       Given the app is running
       When the recognizer emits the partial "buffer sa"
       Then the chip shows it is hearing "buffer sa"
       And the last-utterance line is unchanged
 
     @transformer
-    Scenario: A dictation mode can only say that it is hearing something
-      # There is no partial result until the whole chunk has been transcribed, so the empty
-      # partial is all this mode has, and it reports the one thing that matters.
+    Scenario: A dictation mode draws what its microphone hears
+      # No partial exists until the whole chunk is transcribed, so loudness is the only proof
+      # that the capture is alive.
       Given the configuration:
         """
         {
@@ -194,9 +194,27 @@ Feature: Showing what the session is doing, in a process of its own
         }
         """
       And the app is running
-      When a voice is detected but nothing has been transcribed yet
-      Then the chip shows it is hearing, with no words
+      When audio arrives
+      Then the chip draws its recent loudness, marking what reaches the energy threshold
       And the chip says "no voice navigation in this mode"
+
+    @transformer
+    Scenario: The chip counts down the silence that ends an utterance
+      Given a dictation mode with "silence_seconds": 2
+      And a recording is in progress
+      When 1.5 seconds of silence pass
+      Then the chip shows 0.5 seconds left, as a bar and as a number
+      When the chunk is flushed
+      Then the chip says it is transcribing until the text arrives
+
+    @transformer @accessibility-critical
+    Scenario: A dictation mode shows a chip that was switched off, and only while it listens
+      Given the chip is switched off
+      When I say "dictate mode"
+      Then the chip is on screen
+      When the voice layer leaves "dictate mode"
+      Then the chip is off screen again
+      And the chip's own toggle is unchanged
 
     Scenario: A fault says why, and not only that there is one
       # The tray has twenty pixels and can only say that something is wrong. The chip has

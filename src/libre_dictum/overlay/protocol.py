@@ -9,7 +9,7 @@ from typing import IO, TYPE_CHECKING, Any
 
 from ..errors import ProtocolError
 from ..layers import Layer
-from ..meters import GestureMeter, HandReading, Reading
+from ..meters import GestureMeter, HandReading, Microphone, Reading
 from ..runtime import runtime_dir
 from ..status import HeldInput, canonical
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..health import Health
     from .model import Entry, Group, ModeView, Snapshot
 
-PROTOCOL_VERSION = 10
+PROTOCOL_VERSION = 11
 
 PAGES = ("index", "group", "modes", "pedals", "gestures")
 
@@ -202,6 +202,7 @@ class State:
     held_gestures: tuple[str, ...] = ()
     meters: tuple[GestureMeter, ...] = ()
     hands: tuple[HandReading, ...] = ()
+    microphone: Microphone | None = None
     dot: CalibrationDot | None = None
 
     @property
@@ -301,7 +302,21 @@ def _state_json(state: State) -> dict[str, Any]:
         "held_gestures": list(state.held_gestures),
         "meters": [_meter_json(meter) for meter in state.meters],
         "hands": [_hand_json(hand) for hand in state.hands],
+        "microphone": _microphone_json(state.microphone),
         "dot": _dot_json(state.dot),
+    }
+
+
+def _microphone_json(microphone: Microphone | None) -> dict[str, Any] | None:
+    if microphone is None:
+        return None
+    return {
+        "levels": list(microphone.levels),
+        "gate": microphone.gate,
+        "recording": microphone.recording,
+        "quiet": microphone.quiet,
+        "patience": microphone.patience,
+        "transcribing": microphone.transcribing,
     }
 
 
@@ -475,7 +490,23 @@ def _state_from(payload: Mapping[str, Any]) -> State:
         held_gestures=_strings(payload, "held_gestures"),
         meters=tuple(_meter_from(meter) for meter in _objects(payload, "meters")),
         hands=tuple(_hand_from(hand) for hand in _objects(payload, "hands")),
+        microphone=_microphone_from(payload.get("microphone")),
         dot=_dot_from(payload.get("dot")),
+    )
+
+
+def _microphone_from(payload: Any) -> Microphone | None:
+    if payload is None:
+        return None
+    if not isinstance(payload, dict):
+        raise ProtocolError(f"'microphone' must be null or a JSON object, not {payload!r}")
+    return Microphone(
+        levels=_numbers(payload, "levels"),
+        gate=_number(payload, "gate"),
+        recording=_boolean(payload, "recording"),
+        quiet=_number(payload, "quiet"),
+        patience=_number(payload, "patience"),
+        transcribing=_boolean(payload, "transcribing"),
     )
 
 
@@ -788,6 +819,7 @@ def state_of(
         held_gestures=snapshot.held_gestures,
         meters=snapshot.meters,
         hands=snapshot.hands,
+        microphone=snapshot.microphone,
     )
 
 

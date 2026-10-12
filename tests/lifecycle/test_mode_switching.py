@@ -154,7 +154,7 @@ class TestFailureIsolation:
     def build(self, executor, settings_of, broken: str):
         streams: dict[str, FakeStream] = {}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             if mode.name == broken:
                 raise RuntimeError("model file vanished")
             streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)

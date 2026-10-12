@@ -5,6 +5,7 @@ import pytest
 
 from libre_dictum.audio.base import AudioStream
 from libre_dictum.errors import DeviceError
+from libre_dictum.meters import Microphone
 
 
 class FakeCapture:
@@ -259,6 +260,66 @@ class TestReportingWhatIsBeingHeard:
 
     def test_a_stream_with_no_display_reports_to_nobody_and_says_nothing(self, stream):
         stream._note_partial("buffer sa")
+
+
+class TestReportingTheMicrophone:
+    """A dictation mode's readings, which hold the chip on screen until None arrives."""
+
+    @pytest.fixture
+    def reported(self):
+        seen: list[Microphone | None] = []
+        instance = ProbeStream(microphone_callback=seen.append)
+        instance.seen_readings = seen  # type: ignore[attr-defined]
+        yield instance
+        instance.stop(timeout=2)
+
+    def test_a_reading_is_reported_while_enabled(self, reported):
+        reported.enable()
+
+        reported._note_microphone(Microphone(levels=(0.5,)))
+
+        assert reported.seen_readings == [Microphone(levels=(0.5,))]
+
+    def test_a_reading_after_disabling_is_dropped(self, reported):
+        reported._note_microphone(Microphone())
+
+        assert reported.seen_readings == []
+
+    def test_disabling_ends_the_readings_once(self, reported):
+        reported.enable()
+        reported._note_microphone(Microphone())
+
+        reported.disable()
+        reported.disable()
+
+        assert reported.seen_readings == [Microphone(), None]
+
+    def test_stopping_ends_them_too(self, reported):
+        reported.enable()
+        reported._note_microphone(Microphone())
+
+        reported.stop(timeout=2)
+
+        assert reported.seen_readings[-1] is None
+
+    def test_a_stream_that_reported_nothing_ends_nothing(self, reported):
+        reported.disable()
+        reported.stop(timeout=2)
+
+        assert reported.seen_readings == []
+
+    def test_a_display_that_raises_does_not_deafen_the_recognizer(self, caplog):
+        def angry(microphone):
+            raise RuntimeError("no")
+
+        instance = ProbeStream(microphone_callback=angry)
+        instance.enable()
+        try:
+            instance._note_microphone(Microphone())
+        finally:
+            instance.stop(timeout=2)
+
+        assert "Reporting the microphone" in caplog.text
 
 
 class TestStalledCapture:

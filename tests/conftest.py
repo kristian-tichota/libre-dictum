@@ -9,6 +9,7 @@ import pytest
 
 from libre_dictum.input.executor import InputExecutor
 from libre_dictum.layers import LayerState
+from libre_dictum.meters import Microphone
 from libre_dictum.modes import ModeManager
 from libre_dictum.settings import AppSettings, ModeSettings, parse_settings
 from libre_dictum.status import HeldInput
@@ -63,11 +64,13 @@ class FakeStream:
         settings: AppSettings,
         on_text: Callable[[str], None],
         on_partial: Callable[[str | None], None] | None = None,
+        on_microphone: Callable[[Microphone | None], None] | None = None,
     ):
         self.mode = mode
         self.settings = settings
         self.on_text = on_text
         self.on_partial = on_partial
+        self.on_microphone = on_microphone
         self.enabled = False
         self.started = False
         self.stopped = False
@@ -164,7 +167,7 @@ def running_modes(executor, settings_of):
     def build(data: dict[str, Any], indicator: FakeIndicator | None = None) -> ModeManager:
         streams: dict[str, FakeStream] = {}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
             return streams[mode.name]
 

@@ -22,6 +22,7 @@ CLASSES = (
     "axis",
     "phrase",
     "detail",
+    "countdown",
 )
 
 DIALS = (0.0, 0.25, style.DEFAULT_OPACITY, 1.0)

@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum, auto
 
-from ...meters import GestureMeter, HandReading
+from ...meters import GestureMeter, HandReading, Microphone
 from ..protocol import Catalogue, EdgeCard, GroupCard, KeyCard, ModeCard, RouteCard, State
 from .style import TONE_BLOCKED, TONE_LIVE, TONE_MEASURED
 
@@ -37,6 +37,12 @@ TO_GESTURES = "gestures"
 MATCHED = "✓"
 
 HEARING = {None: "···", "": "~~", "words": "~~~~"}
+
+WAVE_WIDTH = 32
+
+TRANSCRIBING = "transcribing…"
+
+AWAITING_SPEECH = "waiting for speech"
 
 MODES_TITLE = "modes"
 MODES_HINT = "where you are, and what gets you elsewhere"
@@ -151,6 +157,7 @@ class Chip:
     wake_with: tuple[str, ...] = ()
     confirming: str | None = None
     notice: str | None = None
+    microphone: Microphone | None = None
 
     @property
     def glyphs(self) -> str:
@@ -209,6 +216,39 @@ class Chip:
             return HEARING[None]
         return HEARING["words"] if self.partial else HEARING[""]
 
+    @property
+    def wave(self) -> tuple[tuple[float, bool], ...]:
+        """The microphone's recent loudness, oldest first, each level above the gate or not."""
+        if self.microphone is None:
+            return ()
+        return wave(self.microphone.levels, self.microphone.gate)
+
+    @property
+    def countdown(self) -> str:
+        """The quiet still allowed before the utterance is sent, or what happens instead."""
+        microphone = self.microphone
+        if microphone is None:
+            return ""
+        if microphone.transcribing:
+            return TRANSCRIBING
+        if not microphone.recording:
+            return AWAITING_SPEECH
+        return f"{microphone.left:.1f}s"
+
+    @property
+    def remaining(self) -> float | None:
+        """The countdown as a fraction of its whole, or None while nothing is being recorded."""
+        microphone = self.microphone
+        if microphone is None or microphone.transcribing or not microphone.recording:
+            return None
+        return microphone.remaining
+
+    @property
+    def counting(self) -> bool:
+        """Whether an utterance is being taken in or transcribed."""
+        microphone = self.microphone
+        return microphone is not None and (microphone.recording or microphone.transcribing)
+
     def tooltip(self) -> str:
         """Every held key and the saved value, in words."""
         parts = [key.describe() for key in self.held]
@@ -242,7 +282,16 @@ def chip_of(state: State | None, catalogue: Catalogue | None = None) -> Chip:
         wake_with=state.wake_with,
         confirming=state.confirming,
         notice=state.notice,
+        microphone=state.microphone,
     )
+
+
+def wave(
+    levels: Sequence[float], gate: float, width: int = WAVE_WIDTH
+) -> tuple[tuple[float, bool], ...]:
+    """The last width levels, clamped to [0, 1], each paired with whether it reaches the gate."""
+    recent = list(levels)[-width:] if width > 0 else []
+    return tuple((min(max(level, 0.0), 1.0), level >= gate) for level in recent)
 
 
 def _held_gestures(state: State, catalogue: Catalogue | None) -> tuple[tuple[str, str], ...]:

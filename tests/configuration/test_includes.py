@@ -353,7 +353,7 @@ class TestReloadingAFileSet:
     def manager(self, executor, config_dir):
         built: list[str] = []
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             built.append(mode.name)
             return FakeStream(mode, settings, on_text, on_partial)
 

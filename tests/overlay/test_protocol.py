@@ -10,7 +10,7 @@ import pytest
 from libre_dictum.errors import ProtocolError
 from libre_dictum.health import Health
 from libre_dictum.layers import LayerState
-from libre_dictum.meters import GestureMeter, HandReading, Reading
+from libre_dictum.meters import GestureMeter, HandReading, Microphone, Reading
 from libre_dictum.overlay import model, protocol
 from libre_dictum.status import Grip, HeldInput
 
@@ -268,6 +268,7 @@ _NON_DEFAULT: dict[str, object] = {
     "page": "modes",
     "group": "focus",
     "held_gestures": ("fist",),
+    "microphone": Microphone(levels=(0.25, 0.5), gate=0.4, recording=True, quiet=0.5, patience=2),
 }
 
 
@@ -413,6 +414,17 @@ class TestTheReadingsSurviveTheWire:
         assert round_trip(self.state()).meters == ()
         assert round_trip(self.state()).hands == ()
 
+    def test_a_dictation_reading_comes_back_intact(self):
+        microphone = Microphone(
+            levels=(0.1, 0.62, 0.3), gate=0.4, recording=True, quiet=0.7, patience=2.0
+        )
+        state = protocol.state_of(model.Snapshot(microphone=microphone), revision=3)
+
+        assert round_trip(state).microphone == microphone
+
+    def test_no_dictation_mode_listening_carries_null(self):
+        assert round_trip(self.state()).microphone is None
+
     def test_a_page_of_readings_still_fits_on_one_line(self):
         meters = [
             GestureMeter(
@@ -456,6 +468,13 @@ class TestAMalformedFrameIsRefused:
         payload["chip"] = None
 
         with pytest.raises(ProtocolError, match="'chip'"):
+            protocol.decode(json.dumps(payload))
+
+    def test_a_microphone_that_is_not_an_object(self):
+        payload = json.loads(protocol.encode(protocol.State()))
+        payload["microphone"] = [0.5]
+
+        with pytest.raises(ProtocolError, match="'microphone'"):
             protocol.decode(json.dumps(payload))
 
     def test_a_revision_that_is_a_boolean(self):

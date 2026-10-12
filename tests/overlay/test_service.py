@@ -10,7 +10,7 @@ from libre_dictum.errors import ProtocolError
 from libre_dictum.health import Health
 from libre_dictum.input.dsl import HUD_TARGETS
 from libre_dictum.layers import ALL_LAYERS, Layer, LayerState, SleepView
-from libre_dictum.meters import GestureMeter, HandReading, Reading
+from libre_dictum.meters import GestureMeter, HandReading, Microphone, Reading
 from libre_dictum.overlay import model, protocol
 from libre_dictum.overlay.service import HudService
 from libre_dictum.status import HeldInput
@@ -308,6 +308,41 @@ class TestTheOutputTheSurfacesMayUse:
         assert catalogue.output == ""
 
 
+class TestADictationModeListening:
+    """The chip a dictation mode needs, whatever its toggle says."""
+
+    def test_a_reading_reaches_a_display(self, service, display):
+        one = display()
+
+        service.set_microphone(Microphone(levels=(0.2, 0.7), gate=0.4, recording=True))
+
+        state = one.state_where(lambda s: s.microphone is not None)
+        assert state.microphone.levels == (0.2, 0.7)
+
+    def test_it_shows_a_chip_that_was_switched_off(self, service):
+        service.toggle_chip()
+
+        service.set_microphone(Microphone())
+
+        assert service.state().chip
+
+    def test_the_chip_goes_back_off_once_it_stops(self, service):
+        service.toggle_chip()
+        service.set_microphone(Microphone())
+
+        service.set_microphone(None)
+
+        state = service.state()
+        assert not state.chip and state.microphone is None
+
+    def test_the_toggle_itself_is_left_alone(self, service):
+        service.toggle_chip()
+
+        service.set_microphone(Microphone())
+
+        assert not service.chip
+
+
 class TestAFullSleepTakingTheDisplay:
     """overlay.sleep.hide, and the one thing it has to give back: the wake confirmation."""
 
@@ -373,6 +408,14 @@ class TestAFullSleepTakingTheDisplay:
     ):
         service = self.running(socket_path, settings_of, sleep={"hide": True})
         service.set_sleep(SleepView(asleep=ALL_LAYERS, prompt="wake? again to confirm"))
+
+        service.set_sleep(SleepView(asleep=ALL_LAYERS))
+
+        assert not service.state().chip
+
+    def test_a_dictation_mode_does_not_hold_the_chip_through_it(self, socket_path, settings_of):
+        service = self.running(socket_path, settings_of, sleep={"hide": True})
+        service.set_microphone(Microphone())
 
         service.set_sleep(SleepView(asleep=ALL_LAYERS))
 

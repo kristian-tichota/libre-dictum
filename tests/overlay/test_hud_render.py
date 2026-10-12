@@ -4,7 +4,7 @@ import pytest
 
 from libre_dictum.health import Health
 from libre_dictum.layers import Layer, LayerState, SleepView
-from libre_dictum.meters import GestureMeter, HandReading, Reading
+from libre_dictum.meters import GestureMeter, HandReading, Microphone, Reading
 from libre_dictum.overlay import model, protocol
 from libre_dictum.overlay.hud import render
 from libre_dictum.overlay.protocol import CalibrationDot, State
@@ -248,6 +248,55 @@ class TestTheChip:
 
     def test_a_navigable_mode_says_nothing_of_the_kind(self, catalogue):
         assert render.chip_of(state(), catalogue()).note is None
+
+
+class TestTheMicrophoneOnTheChip:
+    def chip(self, **reading):
+        return render.chip_of(state(microphone=Microphone(**reading)))
+
+    def test_a_command_mode_draws_neither(self):
+        chip = render.chip_of(state())
+
+        assert (chip.wave, chip.countdown, chip.remaining) == ((), "", None)
+
+    def test_each_level_is_marked_by_whether_it_reaches_the_gate(self):
+        assert self.chip(levels=(0.1, 0.4, 0.9), gate=0.4).wave == (
+            (0.1, False),
+            (0.4, True),
+            (0.9, True),
+        )
+
+    def test_only_the_most_recent_levels_are_drawn(self):
+        levels = (0.0,) + (0.9,) * render.WAVE_WIDTH
+
+        assert self.chip(levels=levels).wave == ((0.9, True),) * render.WAVE_WIDTH
+
+    def test_a_level_off_the_scale_is_clamped(self):
+        assert render.wave((-0.5, 1.5), 0.4) == ((0.0, False), (1.0, True))
+
+    def test_before_speech_it_says_it_is_waiting(self):
+        chip = self.chip(patience=2.0)
+
+        assert chip.countdown == render.AWAITING_SPEECH
+        assert chip.remaining is None
+        assert not chip.counting
+
+    def test_while_speaking_the_whole_patience_is_left(self):
+        chip = self.chip(recording=True, patience=2.0)
+
+        assert (chip.countdown, chip.remaining) == ("2.0s", 1.0)
+        assert chip.counting
+
+    def test_quiet_drains_it(self):
+        chip = self.chip(recording=True, quiet=1.5, patience=2.0)
+
+        assert (chip.countdown, chip.remaining) == ("0.5s", 0.25)
+
+    def test_a_transcription_says_so_and_has_nothing_to_count(self):
+        chip = self.chip(recording=False, transcribing=True, patience=2.0)
+
+        assert (chip.countdown, chip.remaining) == (render.TRANSCRIBING, None)
+        assert chip.counting
 
 
 class TestWhenTheSheetDraws:

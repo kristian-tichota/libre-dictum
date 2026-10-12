@@ -87,7 +87,7 @@ def _absolute_app(backend, tmp_path, monkeypatch, config=ABSOLUTE_CONFIG):
     return Application(
         parse_settings(config, tmp_path),
         backend=backend,
-        stream_factory=lambda mode, settings, on_text, on_partial=None: FakeStream(
+        stream_factory=lambda mode, settings, on_text, on_partial=None, **_: FakeStream(
             mode, settings, on_text, on_partial
         ),
     )
@@ -97,7 +97,7 @@ def _absolute_app(backend, tmp_path, monkeypatch, config=ABSOLUTE_CONFIG):
 def app(backend, tmp_path, monkeypatch):
     streams: dict[str, FakeStream] = {}
 
-    def factory(mode, settings, on_text, on_partial=None):
+    def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
         streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
         return streams[mode.name]
 
@@ -115,7 +115,7 @@ class TestAShutdownThatArrivesDuringStartup:
     def application(self, backend, tmp_path, *, on_build=None):
         streams: dict[str, FakeStream] = {}
 
-        def factory(mode, settings, on_text, on_partial=None):
+        def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
             streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
             if on_build is not None:
                 on_build(mode.name)

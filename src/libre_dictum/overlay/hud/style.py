@@ -13,8 +13,16 @@ DEFAULT_SCALE = 1.2
 MIN_SCALE, MAX_SCALE = 0.5, 3.0
 
 TONE_LIVE = "hearing"
+TONE_IDLE = "dim"
 TONE_BLOCKED = "miss"
 TONE_MEASURED = "detail"
+
+HEARING_RGB = (127, 209, 160)
+
+WAVE_LOUD = (*(channel / 255 for channel in HEARING_RGB), 1.0)
+WAVE_QUIET = (232 / 255, 232 / 255, 234 / 255, 0.35)
+
+WAVE_HEIGHT = 22
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -28,6 +36,7 @@ def stylesheet(opacity: float = DEFAULT_OPACITY, scale: float = DEFAULT_SCALE) -
     edge = round(panel * EDGE_OF_OPACITY, 3)
     text = round(clamp(scale, MIN_SCALE, MAX_SCALE) * 100)
     red, green, blue = SURFACE_RGB
+    hearing = ", ".join(str(channel) for channel in HEARING_RGB)
     return f"""\
 /* The window paints nothing: the theme's opaque window background is the "solid block"
    the surfaces must never be, and an id beats the theme's class. */
@@ -51,7 +60,7 @@ label {{
 label.mode {{ font-weight: bold; }}
 label.glyph {{ font-size: 115%; }}
 label.quiet, label.dim {{ color: rgba(232, 232, 234, 0.62); }}
-label.hearing {{ color: #7fd1a0; }}
+label.hearing {{ color: rgb({hearing}); }}
 label.miss {{ color: #e0a33c; }}
 label.fault {{ color: #f05a4f; font-weight: bold; }}
 label.title {{ font-weight: bold; font-size: 120%; letter-spacing: 1px; }}
@@ -61,6 +70,23 @@ label.detail {{ color: rgba(232, 232, 234, 0.66); font-family: monospace; font-s
 /* A meter is read as a column of numbers settling, so it is monospace whatever tone it is
    drawn in -- a proportional digit makes a bar jitter as its value changes. */
 label.meter {{ font-family: monospace; font-size: 92%; }}
+progressbar.countdown > trough {{
+  min-height: 4px;
+  border: none;
+  border-radius: 2px;
+  box-shadow: none;
+  background-image: none;
+  background-color: rgba(232, 232, 234, 0.18);
+}}
+progressbar.countdown > trough > progress {{
+  min-height: 4px;
+  min-width: 0;
+  margin: 0;
+  border: none;
+  border-radius: 2px;
+  background-image: none;
+  background-color: rgb({hearing});
+}}
 label.note {{ color: rgba(232, 232, 234, 0.66); font-family: monospace; font-size: 88%; }}
 /* Sleep is not a fault and must not read as one: a mechanism deliberately put beyond reach
    is the calmest thing on this display. Italic and dim rather than coloured, because the

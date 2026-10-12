@@ -26,7 +26,7 @@ from .layers import (
     parse_layers,
     parse_names,
 )
-from .meters import GestureMeter, HandReading
+from .meters import GestureMeter, HandReading, Microphone
 from .modes import ModeIndicator, ModeManager
 from .overlay import model
 from .overlay.protocol import default_socket_path
@@ -166,6 +166,7 @@ class Application:
             executor=self.executor,
             on_text=self._on_text,
             on_partial=self._on_partial,
+            on_microphone=self._on_microphone,
             stream_factory=stream_factory,
             indicator=self._displays,
             settings_loader=lambda: load_configuration(settings.config_dir),
@@ -375,6 +376,11 @@ class Application:
         """What is being heard right now, straight off a recognizer worker."""
         if self.hud is not None:
             _tell(DISPLAY_SUBSYSTEM, partial(self.hud.set_partial, partial_text))
+
+    def _on_microphone(self, microphone: Microphone | None) -> None:
+        """What a dictation mode hears right now, straight off its worker."""
+        if self.hud is not None:
+            _tell(DISPLAY_SUBSYSTEM, partial(self.hud.set_microphone, microphone))
 
     def _switch_mode(self, name: str, from_program: bool) -> None:
         self.modes.switch(name, from_program)

@@ -13,6 +13,8 @@ from ..errors import DeviceError
 if TYPE_CHECKING:
     import sounddevice as sd
 
+    from ..meters import Microphone
+
 logger = logging.getLogger(__name__)
 
 _QUEUE_TIMEOUT_SECONDS = 0.2
@@ -31,6 +33,7 @@ class AudioStream(ABC):
         block_duration: float = 0.1,
         chunk_callback: Callable[[str], None] | None = None,
         partial_callback: Callable[[str | None], None] | None = None,
+        microphone_callback: Callable[[Microphone | None], None] | None = None,
         stall_seconds: float = STALL_SECONDS,
     ) -> None:
         self.name = name
@@ -38,6 +41,7 @@ class AudioStream(ABC):
         self.block_duration = block_duration
         self.chunk_callback = chunk_callback
         self.partial_callback = partial_callback
+        self.microphone_callback = microphone_callback
         self.stall_seconds = stall_seconds
         self.enabled = False
         self.failure: BaseException | None = None
@@ -49,6 +53,8 @@ class AudioStream(ABC):
         self._last_block = 0.0
         self._last_check = 0.0
         self._partial: str | None = None
+        self._microphone_lock = threading.Lock()
+        self._microphone_shown = False
 
     def start(self) -> None:
         """Open the microphone and start the worker thread."""
@@ -82,6 +88,7 @@ class AudioStream(ABC):
                     timeout,
                 )
             self._worker = None
+        self._note_microphone(None)
 
     def enable(self) -> None:
         self.enabled = True
@@ -89,6 +96,7 @@ class AudioStream(ABC):
     def disable(self) -> None:
         self.enabled = False
         self._note_partial(None)
+        self._note_microphone(None)
         self._on_disabled()
 
     def _queue_block(self, block: Any) -> None:
@@ -159,6 +167,21 @@ class AudioStream(ABC):
             self.partial_callback(partial)
         except Exception:  # noqa: BLE001 - a display must not deafen the recognizer
             logger.exception("Reporting a partial for mode %r failed", self.name)
+
+    def _note_microphone(self, microphone: Microphone | None) -> None:
+        """Report a reading while enabled, and None once after the last one."""
+        if self.microphone_callback is None:
+            return
+        with self._microphone_lock:
+            if microphone is not None and not self.enabled:
+                return
+            if microphone is None and not self._microphone_shown:
+                return
+            self._microphone_shown = microphone is not None
+            try:
+                self.microphone_callback(microphone)
+            except Exception:  # noqa: BLE001 - a display must not deafen the recognizer
+                logger.exception("Reporting the microphone for mode %r failed", self.name)
 
     def _on_disabled(self) -> None:  # noqa: B027 - an optional hook, not a requirement
         """Hook: drop any half-accumulated state when the mode is switched away from."""

@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+import math
 from collections import deque
 
 import numpy as np
+
+from ..meters import Microphone
+
+FLOOR_DB = -60.0
+
+CEILING_DB = -10.0
+
+LEVEL_SECONDS = 0.05
+
+LEVEL_HISTORY = 32
 
 
 def rms(audio: np.ndarray) -> float:
@@ -11,6 +22,14 @@ def rms(audio: np.ndarray) -> float:
     if audio.size == 0:
         return 0.0
     return float(np.sqrt(np.mean(np.square(audio))))
+
+
+def loudness(level: float) -> float:
+    """An RMS level on a decibel scale: 0.0 at FLOOR_DB, 1.0 at CEILING_DB."""
+    if level <= 0.0:
+        return 0.0
+    decibels = 20.0 * math.log10(level)
+    return min(max((decibels - FLOOR_DB) / (CEILING_DB - FLOOR_DB), 0.0), 1.0)
 
 
 class VoiceActivityChunker:
@@ -43,6 +62,11 @@ class VoiceActivityChunker:
     def recording(self) -> bool:
         """Whether an utterance is currently being accumulated."""
         return bool(self._chunk)
+
+    @property
+    def quiet(self) -> float:
+        """Seconds of silence since the current utterance last rose above the threshold."""
+        return self._silence_seconds
 
     def push(self, block: np.ndarray) -> np.ndarray | None:
         """Feed one block; returns a finished chunk when the utterance ends."""
@@ -86,3 +110,40 @@ class VoiceActivityChunker:
         self._chunk_seconds = 0.0
         self._silence_seconds = 0.0
         self._pre_roll.clear()
+
+
+class MicrophoneGauge:
+    """Recent loudness and the chunker's progress, as a display draws them."""
+
+    def __init__(
+        self,
+        chunker: VoiceActivityChunker,
+        *,
+        level_seconds: float = LEVEL_SECONDS,
+        history: int = LEVEL_HISTORY,
+    ) -> None:
+        self._chunker = chunker
+        self._slice = max(1, round(chunker.sample_rate * level_seconds))
+        self._levels: deque[float] = deque(maxlen=history)
+
+    def hear(self, block: np.ndarray) -> None:
+        """Record one block's loudness, a level per level_seconds of it."""
+        block = np.asarray(block, dtype=np.float32).reshape(-1)
+        for start in range(0, len(block), self._slice):
+            self._levels.append(loudness(rms(block[start : start + self._slice])))
+
+    def reading(self, *, transcribing: bool = False) -> Microphone:
+        """The levels so far and where the chunker stands."""
+        chunker = self._chunker
+        return Microphone(
+            levels=tuple(self._levels),
+            gate=loudness(chunker.energy_threshold),
+            recording=chunker.recording,
+            quiet=chunker.quiet,
+            patience=chunker.silence_seconds,
+            transcribing=transcribing,
+        )
+
+    def reset(self) -> None:
+        """Forget the levels."""
+        self._levels.clear()

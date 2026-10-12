@@ -57,7 +57,7 @@ class TestHealthMonitor:
 def app(backend, tmp_path):
     streams: dict[str, FakeStream] = {}
 
-    def factory(mode, settings, on_text, on_partial=None):
+    def factory(mode, settings, on_text, on_partial=None, on_microphone=None):
         streams[mode.name] = FakeStream(mode, settings, on_text, on_partial)
         return streams[mode.name]
 

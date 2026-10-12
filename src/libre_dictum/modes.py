@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable, Iterable
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .errors import ConfigError
 from .input.executor import InputExecutor
@@ -16,6 +16,9 @@ from .streams import (
     describe_model,
     mode_vocabulary,
 )
+
+if TYPE_CHECKING:
+    from .meters import Microphone
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,7 @@ class ModeManager:
         executor: InputExecutor,
         on_text: Callable[[str], None],
         on_partial: Callable[[str | None], None] | None = None,
+        on_microphone: Callable[[Microphone | None], None] | None = None,
         stream_factory: StreamFactory = build_stream,
         indicator: ModeIndicator | None = None,
         settings_loader: Callable[[], AppSettings] | None = None,
@@ -60,6 +64,7 @@ class ModeManager:
         self._executor = executor
         self._on_text = on_text
         self._on_partial = on_partial
+        self._on_microphone = on_microphone
         self._build_stream = stream_factory
         self._indicator = indicator
         self._load_settings = settings_loader
@@ -119,7 +124,13 @@ class ModeManager:
         """Build and start one mode's recognizer, or record why it will not run."""
         logger.info("Loading %s for mode %r", describe_model(mode), mode.name)
         try:
-            stream = self._build_stream(mode, self.settings, self._on_text, self._on_partial)
+            stream = self._build_stream(
+                mode,
+                self.settings,
+                self._on_text,
+                self._on_partial,
+                on_microphone=self._on_microphone,
+            )
             stream.start()
         except Exception as exc:  # noqa: BLE001 - one mode's problem, not the session's
             logger.exception("Mode %r will not run", mode.name)
