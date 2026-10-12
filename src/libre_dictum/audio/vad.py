@@ -125,14 +125,12 @@ class MicrophoneGauge:
         self._chunker = chunker
         self._slice = max(1, round(chunker.sample_rate * level_seconds))
         self._levels: deque[float] = deque(maxlen=history)
-        self._heard = 0
 
     def hear(self, block: np.ndarray) -> None:
         """Record one block's loudness, a level per level_seconds of it."""
         block = np.asarray(block, dtype=np.float32).reshape(-1)
         for start in range(0, len(block), self._slice):
             self._levels.append(loudness(rms(block[start : start + self._slice])))
-            self._heard += 1
 
     def reading(self, *, transcribing: bool = False) -> Microphone:
         """The levels so far and where the chunker stands."""
@@ -144,11 +142,8 @@ class MicrophoneGauge:
             quiet=chunker.quiet,
             patience=chunker.silence_seconds,
             transcribing=transcribing,
-            heard=self._heard,
-            period=self._slice / chunker.sample_rate,
         )
 
     def reset(self) -> None:
-        """Forget the levels and start counting again."""
+        """Forget the levels."""
         self._levels.clear()
-        self._heard = 0

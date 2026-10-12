@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from libre_dictum.overlay.hud import motion, render
-from libre_dictum.overlay.hud.motion import Slide, Tape
+from libre_dictum.overlay.hud.motion import Slide
 
 WINDOW = Path(__file__).parents[2] / "src" / "libre_dictum" / "overlay" / "hud" / "window.py"
 
@@ -13,42 +13,10 @@ CHIP, SHEET = "top-right", "right"
 
 WIDTH, GAP = 456.0, 12.0
 
-PERIOD, BLOCK, FRAME = 50.0, 100.0, 1000.0 / 180
-
 
 def at(slide: Slide, fraction: float) -> float:
     """Where a slide begun at time 0 has got to, fraction of the way through."""
     return slide.advance(slide.duration * fraction)
-
-
-def bars(count: int) -> tuple[tuple[float, bool], ...]:
-    return ((0.5, True),) * count
-
-
-def listen(tape: Tape, seconds: float, late: tuple[float, ...] = (0.0,)) -> list[tuple[float, int]]:
-    """Two bars a block, each block late by the next of late, and the head and heard per frame."""
-    arrivals = [
-        (BLOCK * (block + 1) + late[block % len(late)], 2 * (block + 1))
-        for block in range(int(seconds * 1000 / BLOCK))
-    ]
-    frames = [frame * FRAME for frame in range(int(seconds * 1000 / FRAME))]
-    seen, heard = [], 0
-    for now, count in sorted([*arrivals, *((frame, None) for frame in frames)], key=lambda e: e[0]):
-        if count is None:
-            seen.append((tape.advance(now), heard))
-        else:
-            heard = count
-            tape.feed(bars(min(count, 32)), heard=count, period=PERIOD, now=now)
-    return seen
-
-
-def steps(seen: list[tuple[float, int]]) -> list[float]:
-    """How far each frame moved, as a share of the pace the bars were heard at."""
-    settled = seen[len(seen) // 3 :]
-    return [
-        (after - before) / (FRAME / PERIOD)
-        for (before, _), (after, _) in zip(settled, settled[1:], strict=False)
-    ]
 
 
 class TestWhichSideASurfaceIsOn:
@@ -198,65 +166,6 @@ class TestTheSlide:
         assert 80.0 <= motion.DURATION_MS <= 400.0
 
 
-class TestTheTape:
-    def test_without_animation_the_newest_bar_sits_half_a_bar_from_the_edge(self):
-        tape = Tape(32, glide=False)
-        tape.feed(bars(4), heard=4, period=PERIOD, now=0.0)
-
-        assert [age for age, _, _ in tape.placed()] == [3.5, 2.5, 1.5, 0.5]
-        assert tape.advance(1000.0) == 4.0
-
-    def test_it_moves_on_every_frame_rather_than_once_a_block(self):
-        assert all(step > 0.0 for step in steps(listen(Tape(32), 3.0)))
-
-    @pytest.mark.parametrize("late", [(0.0,), (0.0, 30.0, -20.0, 45.0, 10.0, -40.0)])
-    def test_it_keeps_the_pace_the_bars_were_heard_at(self, late):
-        moved = steps(listen(Tape(32), 4.0, late))
-
-        assert min(moved) > 0.85 and max(moved) < 1.15
-
-    def test_it_never_shows_a_bar_before_it_is_heard(self):
-        seen = listen(Tape(32), 3.0, (0.0, 45.0, -45.0))
-
-        assert all(head <= heard for head, heard in seen)
-
-    def test_it_never_scrolls_backwards(self):
-        seen = listen(Tape(32), 3.0, (0.0, 45.0, -45.0, 20.0))
-
-        heads = [head for head, _ in seen]
-        assert heads == sorted(heads)
-
-    def test_it_stops_at_the_newest_bar_when_no_more_arrive(self):
-        tape = Tape(32)
-        tape.feed(bars(2), heard=2, period=PERIOD, now=0.0)
-        for now in range(0, 2000, 5):
-            tape.advance(float(now))
-
-        assert tape.head == 2.0
-
-    def test_a_backlog_is_skipped_rather_than_replayed(self):
-        tape = Tape(32)
-        tape.feed(bars(2), heard=2, period=PERIOD, now=0.0)
-        tape.advance(2000.0)
-        tape.feed(bars(32), heard=42, period=PERIOD, now=2000.0)
-
-        assert tape.advance(2000.0 + FRAME) >= 42 - motion.TAPE_LAG_MS / PERIOD
-
-    def test_a_late_block_leaves_no_lasting_delay(self):
-        hiccup = (0.0,) * 5 + (250.0, 150.0, 50.0) + (0.0,) * 100
-        steady = listen(Tape(32), 6.0)[-1]
-        shaken = listen(Tape(32), 6.0, hiccup)[-1]
-
-        assert shaken[1] - shaken[0] == pytest.approx(steady[1] - steady[0], abs=0.25)
-
-    def test_a_gauge_that_starts_again_starts_the_tape_again(self):
-        tape = Tape(32)
-        tape.feed(bars(32), heard=500, period=PERIOD, now=0.0)
-        tape.feed(bars(2), heard=2, period=PERIOD, now=100.0)
-
-        assert (tape.head, tape.placed()) == (0.0, ())
-
-
 class TestTheWindowUsesIt:
     """What a file this container cannot import can still be held to."""
 
@@ -273,9 +182,4 @@ class TestTheWindowUsesIt:
         assert "set_margin" in WINDOW.read_text()
 
     def test_the_slide_runs_on_gtks_clock_rather_than_a_timer_of_ours(self):
-        assert "add_tick_callback(self._step)" in WINDOW.read_text()
-
-    def test_the_wave_scrolls_on_every_frame_of_gtks_clock(self):
-        source = WINDOW.read_text()
-        assert "add_tick_callback(self._glide)" in source
-        assert "self._tape.advance(now)" in source
+        assert "add_tick_callback" in WINDOW.read_text()

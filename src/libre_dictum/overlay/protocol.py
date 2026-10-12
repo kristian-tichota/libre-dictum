@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..health import Health
     from .model import Entry, Group, ModeView, Snapshot
 
-PROTOCOL_VERSION = 12
+PROTOCOL_VERSION = 11
 
 PAGES = ("index", "group", "modes", "pedals", "gestures")
 
@@ -317,8 +317,6 @@ def _microphone_json(microphone: Microphone | None) -> dict[str, Any] | None:
         "quiet": microphone.quiet,
         "patience": microphone.patience,
         "transcribing": microphone.transcribing,
-        "heard": microphone.heard,
-        "period": microphone.period,
     }
 
 
@@ -509,8 +507,6 @@ def _microphone_from(payload: Any) -> Microphone | None:
         quiet=_number(payload, "quiet"),
         patience=_number(payload, "patience"),
         transcribing=_boolean(payload, "transcribing"),
-        heard=_integer(payload, "heard"),
-        period=_number(payload, "period"),
     )
 
 
