@@ -141,6 +141,13 @@ class TestTheChip:
         assert chip.fault == "mode 'root mode' (model file vanished)"
         assert "model file vanished" in chip.tooltip()
 
+    def test_a_lost_camera_is_one_quiet_line_and_not_a_fault(self):
+        health = Health(failed=(("head tracking", "the camera stopped returning frames"),))
+        chip = render.chip_of(state(health=health))
+
+        assert chip.fault is None
+        assert chip.offline_line == "head tracking off"
+
     def test_nothing_asleep_draws_no_sleep_line(self):
         assert render.chip_of(state()).sleep_line == ""
 

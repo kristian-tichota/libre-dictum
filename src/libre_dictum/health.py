@@ -5,6 +5,11 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+HEAD_SUBSYSTEM = "head tracking"
+HAND_SUBSYSTEM = "hand tracking"
+
+QUIET_SUBSYSTEMS = frozenset({HEAD_SUBSYSTEM, HAND_SUBSYSTEM})
+
 
 class FaultIndicator(Protocol):
     """The part of a status indicator that shows something is wrong."""
@@ -24,6 +29,16 @@ class Health:
     @property
     def ok(self) -> bool:
         return not self.failed
+
+    @property
+    def faults(self) -> tuple[tuple[str, str], ...]:
+        """The failures a display states with their reason."""
+        return tuple(entry for entry in self.failed if entry[0] not in QUIET_SUBSYSTEMS)
+
+    @property
+    def offline(self) -> tuple[str, ...]:
+        """The failed subsystems a display names quietly, without a reason."""
+        return tuple(name for name, _ in self.failed if name in QUIET_SUBSYSTEMS)
 
     def reason(self, subsystem: str) -> str | None:
         """Why subsystem is not working, or None if it is."""

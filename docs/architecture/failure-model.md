@@ -40,7 +40,9 @@ connected display, or a sleeping mechanism.
 anything. `HealthMonitor` is handed the **whole picture** and reports only differences, which is
 what makes a recovery reportable and keeps a camera that fails 60 times a second out of the log. On
 the tray a fault is an **exclamation mark rather than a colour**, because every colour is one a mode
-may claim. The chip receives the whole `Health`, so it can state the reason.
+may claim. The chip receives the whole `Health` and states each reason, wrapped to three lines at
+most. Head and hand tracking are the exception: the chip names them on one dim line, without the
+reason.
 
 ## Hands-free recovery
 

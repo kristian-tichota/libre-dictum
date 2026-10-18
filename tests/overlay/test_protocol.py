@@ -259,6 +259,7 @@ _NON_DEFAULT: dict[str, object] = {
     "notice": "refused: only pedal wakes this",
     "saved": "3",
     "fault": "mode 'a' (gone)",
+    "offline": ("head tracking",),
     "partial": "buffer",
     "heard": "buffer save",
     "matched": "buffer save",
@@ -306,6 +307,15 @@ class TestAStateSurvivesTheWire:
         back = round_trip(self.snapshot(health=health))
 
         assert back.fault == "mode 'a' (model file vanished)"
+
+    def test_a_lost_camera_is_named_without_its_reason(self):
+        health = Health(
+            failed=(("head tracking", "no camera would deliver a frame"), ("mode 'a'", "gone"))
+        )
+        back = round_trip(self.snapshot(health=health))
+
+        assert back.fault == "mode 'a' (gone)"
+        assert back.offline == ("head tracking",)
 
     def test_a_healthy_session_has_no_fault(self):
         assert round_trip(self.snapshot(health=Health(working=("mode 'a'",)))).fault is None

@@ -163,6 +163,8 @@ def as_text(state: State, catalogue: Catalogue | None) -> list[str]:
         lines.append(f"  {chip.mark} {chip.partial or chip.utterance}".rstrip())
         if chip.fault:
             lines.append(f"  ! {chip.fault}")
+        if chip.offline_line:
+            lines.append(f"  {chip.offline_line}")
         if chip.note:
             lines.append(f"  ({chip.note})")
 

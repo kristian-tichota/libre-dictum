@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..health import Health
     from .model import Entry, Group, ModeView, Snapshot
 
-PROTOCOL_VERSION = 11
+PROTOCOL_VERSION = 12
 
 PAGES = ("index", "group", "modes", "pedals", "gestures")
 
@@ -191,6 +191,7 @@ class State:
     held: tuple[KeyCard, ...] = ()
     saved: str | None = None
     fault: str | None = None
+    offline: tuple[str, ...] = ()
     partial: str | None = None
     heard: str | None = None
     matched: str | None = None
@@ -291,6 +292,7 @@ def _state_json(state: State) -> dict[str, Any]:
         "held": [[key.key, key.symbol, key.grip] for key in state.held],
         "saved": state.saved,
         "fault": state.fault,
+        "offline": list(state.offline),
         "partial": state.partial,
         "heard": state.heard,
         "matched": state.matched,
@@ -479,6 +481,7 @@ def _state_from(payload: Mapping[str, Any]) -> State:
         ),
         saved=_optional_string(payload, "saved"),
         fault=_optional_string(payload, "fault"),
+        offline=_strings(payload, "offline"),
         partial=_optional_string(payload, "partial"),
         heard=_optional_string(payload, "heard"),
         matched=_optional_string(payload, "matched"),
@@ -807,6 +810,7 @@ def state_of(
         held=_held_of(snapshot.held),
         saved=snapshot.held.saved,
         fault=_fault_of(snapshot.health),
+        offline=snapshot.health.offline,
         partial=snapshot.heard.partial,
         heard=snapshot.heard.text,
         matched=snapshot.heard.matched,
@@ -832,6 +836,6 @@ def _held_of(held: HeldInput) -> tuple[KeyCard, ...]:
 
 def _fault_of(health: Health) -> str | None:
     """What is broken, with the reason."""
-    if health.ok:
+    if not health.faults:
         return None
-    return "; ".join(f"{name} ({reason})" for name, reason in health.failed)
+    return "; ".join(f"{name} ({reason})" for name, reason in health.faults)

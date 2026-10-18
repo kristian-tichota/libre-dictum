@@ -223,6 +223,11 @@ Feature: Showing what the session is doing, in a process of its own
       When the recognizer for "root mode" dies with "model file vanished"
       Then the chip shows "mode 'root mode' (model file vanished)"
 
+    Scenario: A lost camera is one dim line, and the chip keeps its width
+      When head tracking fails with a long camera error
+      Then the chip shows "head tracking off" in the dim tone
+      And the chip shows no fault line
+
   Rule: the chip says where the other two mechanisms are, but only when it matters
 
     Three names on screen that usually agree would be three names nobody reads. The row acts as

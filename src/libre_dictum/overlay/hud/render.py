@@ -82,6 +82,8 @@ LAYER_JOIN = " · "
 
 NO_NAVIGATION = "no voice navigation in this mode"
 
+OFFLINE = "{names} off"
+
 ASLEEP_ALL = "asleep"
 ASLEEP_SOME = "asleep: {layers}"
 
@@ -152,6 +154,7 @@ class Chip:
     missed: bool = False
     partial: str | None = None
     fault: str | None = None
+    offline: tuple[str, ...] = ()
     note: str | None = None
     asleep: tuple[str, ...] = ()
     wake_with: tuple[str, ...] = ()
@@ -208,6 +211,11 @@ class Chip:
         if self.confirming is not None:
             parts.append(self.confirming)
         return LAYER_JOIN.join(parts)
+
+    @property
+    def offline_line(self) -> str:
+        """The optional subsystems that are down, or empty when none is."""
+        return OFFLINE.format(names=", ".join(self.offline)) if self.offline else ""
 
     @property
     def mark(self) -> str:
@@ -277,6 +285,7 @@ def chip_of(state: State | None, catalogue: Catalogue | None = None) -> Chip:
         missed=state.missed,
         partial=state.partial,
         fault=state.fault,
+        offline=state.offline,
         note=None if mode is None or mode.navigable else NO_NAVIGATION,
         asleep=state.asleep,
         wake_with=state.wake_with,

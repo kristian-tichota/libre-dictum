@@ -13,7 +13,7 @@ from . import instance
 from .control.protocol import default_socket_path as default_control_path
 from .control.service import ControlService
 from .dispatch import CommandDispatcher
-from .health import FaultIndicator, Health, HealthMonitor
+from .health import HAND_SUBSYSTEM, HEAD_SUBSYSTEM, FaultIndicator, Health, HealthMonitor
 from .input.devices import InputBackend, UinputBackend
 from .input.dsl import runnable_while_asleep
 from .input.executor import InputExecutor
@@ -70,9 +70,6 @@ DISPLAY_SUBSYSTEM = "display socket"
 CONTROL_SUBSYSTEM = "control socket"
 
 PEDAL_SUBSYSTEM = "pedals"
-
-HEAD_SUBSYSTEM = "head tracking"
-HAND_SUBSYSTEM = "hand tracking"
 
 
 def _describe(failure: BaseException) -> str:

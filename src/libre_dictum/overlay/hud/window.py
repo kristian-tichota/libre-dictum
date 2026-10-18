@@ -55,6 +55,10 @@ MARGIN = 12
 
 SHEET_WIDTH = 380
 
+FAULT_WIDTH_CHARS = 40
+
+FAULT_LINES = 3
+
 INDEX_COLUMNS = 2
 
 
@@ -259,6 +263,11 @@ class ChipSurface(Surface):
         self._gestures.set_ellipsize(3)
         self._sleep = _label("", "sleep")
         self._fault = _label("", "fault")
+        self._fault.set_wrap(True)
+        self._fault.set_max_width_chars(FAULT_WIDTH_CHARS)
+        self._fault.set_lines(FAULT_LINES)
+        self._fault.set_ellipsize(3)
+        self._offline = _label("", "dim")
         self._note = _label("", "dim")
         for widget in (
             top,
@@ -269,6 +278,7 @@ class ChipSurface(Surface):
             self._wave,
             self._countdown,
             self._fault,
+            self._offline,
             self._note,
         ):
             self.body.append(widget)
@@ -305,6 +315,9 @@ class ChipSurface(Surface):
         _classify(self._left, style.TONE_IDLE, not chip.counting)
         self._fault.set_text(chip.fault or "")
         self._fault.set_visible(chip.fault is not None)
+        offline = chip.offline_line
+        self._offline.set_text(offline)
+        self._offline.set_visible(bool(offline))
         self._note.set_text(chip.note or "")
         self._note.set_visible(chip.note is not None)
         self.window.set_tooltip_text(chip.tooltip() or None)
