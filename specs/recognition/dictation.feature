@@ -178,6 +178,19 @@ Feature: Dictation with a transformer model
       When a chunk is transcribed
       Then the model is asked to decode in language "cs"
 
+  Rule: Dictation on a GPU outranks other GPU work
+
+    Scenario: A GPU model transcribes on the highest-priority stream
+      Given a transformer mode with model_name "openai/whisper-large-v3" and transformer_device "cuda"
+      And another process keeps the GPU busy
+      When a chunk is transcribed
+      Then the transcription runs on the highest-priority stream of device "cuda"
+
+    Scenario: A CPU model keeps the default stream
+      Given a transformer mode with model_name "openai/whisper-large-v3" and transformer_device "cpu"
+      When a chunk is transcribed
+      Then the transcription runs on the default stream
+
   Rule: A model already on disk is loaded without contacting the Hub
 
     Startup runs before the user can say anything, so it must not wait on the network. Left to

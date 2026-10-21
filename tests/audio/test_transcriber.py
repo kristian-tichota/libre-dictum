@@ -1,11 +1,17 @@
+import contextlib
 import logging
+import sys
+from types import SimpleNamespace
 
 import pytest
 
 from libre_dictum.audio import transcriber as transcriber_module
 from libre_dictum.audio.transcriber import (
+    TransformersTranscriber,
+    WhisperTranscriber,
     create_transcriber,
     load_cached_first,
+    priority_stream,
     takes_language,
 )
 
@@ -111,3 +117,97 @@ class TestWhereTheLanguageGoes:
 
     def test_an_unintrospectable_callable_falls_back_to_the_old_path(self):
         assert not takes_language(object())
+
+
+@pytest.fixture
+def torch(monkeypatch):
+    """Install a torch stand-in that tracks the current stream and synchronizations."""
+    state = SimpleNamespace(current=None, synchronized=[])
+
+    class Stream:
+        def __init__(self, device, priority):
+            self.device, self.priority = device, priority
+
+        @staticmethod
+        def priority_range():
+            return (0, -5)
+
+    @contextlib.contextmanager
+    def stream(selected):
+        previous, state.current = state.current, selected
+        try:
+            yield
+        finally:
+            state.current = previous
+
+    fake = SimpleNamespace(
+        device=lambda name: SimpleNamespace(type=name.split(":")[0]),
+        cuda=SimpleNamespace(Stream=Stream, stream=stream, synchronize=state.synchronized.append),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake)
+    return state
+
+
+class TestGpuPriority:
+    """Dictation outranks other GPU work, such as a training job."""
+
+    def test_a_gpu_device_gets_its_highest_priority_stream(self, torch):
+        stream = priority_stream("cuda:0")
+        assert (stream.device.type, stream.priority) == ("cuda", -5)
+
+    def test_work_already_queued_finishes_before_the_stream_exists(self, torch):
+        priority_stream("cuda:0")
+        assert len(torch.synchronized) == 1
+
+    def test_a_cpu_device_keeps_the_default_stream(self, torch):
+        assert priority_stream("cpu") is None
+        assert torch.synchronized == []
+
+    def test_whisper_transcribes_on_the_priority_stream(self, torch, monkeypatch):
+        streams = []
+
+        def transcribe(audio, language):
+            streams.append(torch.current)
+            return {"text": "hello"}
+
+        model = SimpleNamespace(device="cuda:0", transcribe=transcribe)
+        monkeypatch.setitem(sys.modules, "whisper", SimpleNamespace(load_model=lambda name: model))
+        transcriber = WhisperTranscriber("turbo")
+        assert transcriber.transcribe(None) == "hello"
+        assert streams == [transcriber._stream]
+
+    def test_transformers_moves_generates_and_decodes_on_the_priority_stream(
+        self, torch, monkeypatch
+    ):
+        calls = []
+
+        def on(step, result):
+            calls.append((step, torch.current))
+            return result
+
+        class Inputs(dict):
+            def to(self, device, dtype):
+                return on("to", self)
+
+        class Processor:
+            def __call__(self, audio, sampling_rate, return_tensors):
+                return Inputs()
+
+            def batch_decode(self, outputs, skip_special_tokens):
+                return on("decode", ["hello"])
+
+        model = SimpleNamespace(
+            device="cuda:0",
+            dtype=None,
+            generation_config=SimpleNamespace(),
+            generate=lambda **kwargs: on("generate", [[1]]),
+        )
+        model.to = lambda device: model
+        transformers = SimpleNamespace(
+            AutoModelForSpeechSeq2Seq=SimpleNamespace(from_pretrained=lambda *a, **k: model),
+            AutoProcessor=SimpleNamespace(from_pretrained=lambda *a, **k: Processor()),
+        )
+        monkeypatch.setitem(sys.modules, "transformers", transformers)
+        transcriber = TransformersTranscriber("some/model", device="cuda")
+        assert transcriber.transcribe(None) == "hello"
+        assert calls == [(step, transcriber._stream) for step in ("to", "generate", "decode")]

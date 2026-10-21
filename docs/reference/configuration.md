@@ -240,7 +240,7 @@ phrases is reported with the count. Commands fire from partial results.
 | Key | Default | Meaning |
 |---|---|---|
 | `model_name` | required | A name of the form `whisper-<name>` loads openai-whisper, so `whisper-turbo` selects `turbo`. Anything else is a HuggingFace identifier. |
-| `transformer_device` | `"auto"` | `"auto"` delegates placement to accelerate. Any other value is used as given. |
+| `transformer_device` | `"auto"` | `"auto"` delegates placement to accelerate. Any other value is used as given. On a CUDA or ROCm device, transcription runs on the device's highest-priority stream. |
 | `lang` | `"en"` | Used where the model accepts a language. |
 | `silence_seconds` | `0.3` | Silence that ends an utterance. |
 | `max_chunk_seconds` | `30.0` | Longest chunk in one go. |
