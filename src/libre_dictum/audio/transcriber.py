@@ -74,7 +74,10 @@ class TransformersTranscriber:
 
         self.model_name = model_name
         placement = {"device_map": "auto"} if device == "auto" else {}
-        self._model = load_cached_first(AutoModelForSpeechSeq2Seq, model_name, **placement)
+        # Workaround: amdgpu stalls ~1 s per GPU copy from a private writable file mapping.
+        self._model = load_cached_first(
+            AutoModelForSpeechSeq2Seq, model_name, disable_mmap=True, **placement
+        )
         if device != "auto":
             self._model = self._model.to(device)
         self._processor = load_cached_first(AutoProcessor, model_name)

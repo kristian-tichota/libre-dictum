@@ -211,3 +211,22 @@ class TestGpuPriority:
         transcriber = TransformersTranscriber("some/model", device="cuda")
         assert transcriber.transcribe(None) == "hello"
         assert calls == [(step, transcriber._stream) for step in ("to", "generate", "decode")]
+
+
+class TestWeightLoading:
+    def test_the_weights_are_read_into_memory_rather_than_mapped(self, monkeypatch):
+        loaded = []
+        model = SimpleNamespace(device="cpu", to=lambda device: model)
+
+        def from_pretrained(*args, **kwargs):
+            loaded.append(kwargs)
+            return model
+
+        transformers = SimpleNamespace(
+            AutoModelForSpeechSeq2Seq=SimpleNamespace(from_pretrained=from_pretrained),
+            AutoProcessor=SimpleNamespace(from_pretrained=lambda *a, **k: print),
+        )
+        monkeypatch.setitem(sys.modules, "transformers", transformers)
+        monkeypatch.setattr(transcriber_module, "priority_stream", lambda device: None)
+        TransformersTranscriber("some/model", device="cpu")
+        assert loaded[0]["disable_mmap"] is True

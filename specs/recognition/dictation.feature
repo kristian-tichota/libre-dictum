@@ -172,6 +172,11 @@ Feature: Dictation with a transformer model
       When the model is loaded
       Then the model is placed on device "cpu"
 
+    Scenario: The weights are read into memory rather than mapped from the file
+      Given a transformer mode with model_name "openai/whisper-large-v3" and transformer_device "cuda"
+      When the model is loaded
+      Then it reaches the GPU in seconds
+
     Scenario: The configured language reaches the model
       # closes C6 — language is passed to the feature extractor, which does not accept it
       Given a transformer mode with model_name "openai/whisper-large-v3" and lang "cs"
