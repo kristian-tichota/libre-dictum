@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from . import __version__
 from .app import DEFAULT_CONFIG_DIR, Application
 from .errors import AlreadyRunningError, CameraError, ConfigError, DeviceError
+from .logs import configure as configure_logging
 from .overlay.protocol import SOCKET_ENV, default_socket_path
 from .tracking.expressions import DEFAULT_ROUNDS as DEFAULT_FACE_ROUNDS
 from .tracking.screenmap import DEFAULT_SIDE, MAX_SIDE
@@ -46,6 +47,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=str.upper,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="how much to report, case-insensitive (default: INFO)",
+    )
+    parser.add_argument(
+        "--log-dir",
+        type=Path,
+        default=None,
+        help=(
+            "also write the log to DIR/libre-dictum.log, rotated, and the traceback of every "
+            "thread on a fatal signal to DIR/libre-dictum.faults"
+        ),
     )
     parser.add_argument(
         "--no-hud",
@@ -555,11 +565,7 @@ def _hand_model_beside(face_model_path: str) -> str | None:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(
-        level=args.log_level,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    configure_logging(args.log_level, args.log_dir, "libre-dictum")
 
     if args.cameras:
         return _list_cameras()

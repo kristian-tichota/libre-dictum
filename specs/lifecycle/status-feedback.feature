@@ -147,6 +147,12 @@ Feature: Knowing what the app is doing
       When the app is started with "--log-level debug"
       Then debug messages are shown
 
+    Scenario: The log is also kept in a directory
+      When the app is started with "--log-dir logs"
+      Then every logged message is also written to "logs/libre-dictum.log"
+      And an exception that ends any thread is logged with its traceback
+      And a fatal signal writes the traceback of every thread to "logs/libre-dictum.faults"
+
     Scenario: A repeated warning is not silently suppressed
       # closes M3 — warnings.warn deduplicates by default, so a config author repeating a bad
       # command sees the warning once and then silence, which reads as the command working

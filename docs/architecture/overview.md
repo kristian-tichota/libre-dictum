@@ -26,8 +26,8 @@ layer testable without hardware.
 | **Typed config** | `settings` | the pure layer |
 | **Adapters** | `sockets`, `control/service`, `input/devices`, `audio/*_stream`, `audio/base`, `audio/transcriber`, `tracking/{tracker,probe,capture,face_capture,screen_capture,v4l2}`, `pedals/device`, `systray`, `overlay/service`, `instance` | the pure layer, `settings` |
 | **Coordination** | `input/executor`, `modes`, `dispatch`, `streams` | everything above |
-| **Wiring** | `app`, `main` | everything |
-| **Another program** | `overlay/hud/*`, `control/send` | `overlay/protocol`, `control/protocol`, `runtime`, `errors`, `meters`, stdlib. **Pure only** — neither process is in the `input` group |
+| **Wiring** | `app`, `main`, `logs` | everything |
+| **Another program** | `overlay/hud/*`, `control/send` | `overlay/protocol`, `control/protocol`, `runtime`, `errors`, `meters`, `logs`, stdlib. **Pure only** — neither process is in the `input` group |
 
 The pure layer is the first two rows plus `overlay/hud/{render,style,motion,compositor}`. `mypy`'s
 strict list MUST cover the Pure logic row, and a test enforces that. `window.py` is the only file

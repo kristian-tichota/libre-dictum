@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from ...errors import LibreDictumError
+from ...logs import configure as configure_logging
 from ..protocol import SOCKET_ENV, Catalogue, State, default_socket_path
 from . import render, style
 from .client import HudClient
@@ -88,16 +89,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="how much to report, case-insensitive (default: INFO)",
     )
+    parser.add_argument(
+        "--log-dir",
+        type=Path,
+        default=None,
+        help=(
+            "also write the log to DIR/libre-dictum-hud.log, rotated, and the traceback of every "
+            "thread on a fatal signal to DIR/libre-dictum-hud.faults"
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    logging.basicConfig(
-        level=args.log_level,
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    configure_logging(args.log_level, args.log_dir, "libre-dictum-hud")
 
     if args.dump:
         return dump(args.socket)

@@ -592,6 +592,51 @@ class TestCommandLine:
         assert parse_args([]).log_level == "INFO"
 
 
+class TestLogDirectory:
+    @pytest.fixture(autouse=True)
+    def restore_logging(self, monkeypatch):
+        import faulthandler
+        import logging
+        import sys
+        import threading
+
+        root = logging.getLogger()
+        handlers = list(root.handlers)
+        monkeypatch.setattr(sys, "excepthook", sys.excepthook)
+        monkeypatch.setattr(threading, "excepthook", threading.excepthook)
+        yield
+        for handler in set(root.handlers) - set(handlers):
+            root.removeHandler(handler)
+            handler.close()
+        logging.captureWarnings(False)
+        faulthandler.enable(file=sys.__stderr__)
+
+    def test_a_startup_error_is_written_to_the_file(self, tmp_path):
+        from libre_dictum.main import main
+
+        assert main(["--config-dir", str(tmp_path / "nowhere"), "--log-dir", str(tmp_path)]) == 1
+        assert "is missing" in (tmp_path / "libre-dictum.log").read_text()
+        assert "started" in (tmp_path / "libre-dictum.faults").read_text()
+
+    def test_an_exception_that_ends_a_thread_is_written_with_its_traceback(self, tmp_path):
+        import threading
+
+        from libre_dictum.logs import configure
+
+        def fail():
+            raise RuntimeError("the camera thread died")
+
+        configure("INFO", tmp_path, "libre-dictum-hud")
+        thread = threading.Thread(target=fail, name="camera")
+        thread.start()
+        thread.join()
+
+        written = (tmp_path / "libre-dictum-hud.log").read_text()
+        assert "Uncaught exception in thread camera" in written
+        assert "RuntimeError: the camera thread died" in written
+        assert "Traceback" in written
+
+
 class TestListingCameras:
     """--cameras answers "which of these numbers is my webcam" before a session."""
 

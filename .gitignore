@@ -6,6 +6,7 @@ __pycache__
 .envrc
 .projectile
 models/
+logs/
 scripts/
 !examples/scripts/
 *.egg-info
