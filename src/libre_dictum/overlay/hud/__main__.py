@@ -95,7 +95,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=(
             "also write the log to DIR/libre-dictum-hud.log, rotated, and the traceback of every "
-            "thread on a fatal signal to DIR/libre-dictum-hud.faults"
+            "thread to DIR/libre-dictum-hud.faults on a fatal signal or on SIGUSR1"
         ),
     )
     return parser.parse_args(argv)

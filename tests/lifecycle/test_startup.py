@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from libre_dictum.app import Application, add_script_path
+from libre_dictum.logs import DUMP_SIGNAL
 from libre_dictum.settings import parse_settings
 from libre_dictum.tracking.cameras import CameraNode
 from tests.conftest import FakeStream
@@ -609,6 +610,7 @@ class TestLogDirectory:
             root.removeHandler(handler)
             handler.close()
         logging.captureWarnings(False)
+        faulthandler.unregister(DUMP_SIGNAL)
         faulthandler.enable(file=sys.__stderr__)
 
     def test_a_startup_error_is_written_to_the_file(self, tmp_path):
@@ -635,6 +637,25 @@ class TestLogDirectory:
         assert "Uncaught exception in thread camera" in written
         assert "RuntimeError: the camera thread died" in written
         assert "Traceback" in written
+
+    def test_the_dump_signal_writes_every_thread_stack(self, tmp_path):
+        import os
+        import threading
+
+        from libre_dictum.logs import configure
+
+        def wait_for_the_model():
+            loaded.wait()
+
+        loaded = threading.Event()
+        thread = threading.Thread(target=wait_for_the_model, name="loader")
+        configure("INFO", tmp_path, "libre-dictum")
+        thread.start()
+        os.kill(os.getpid(), DUMP_SIGNAL)
+        loaded.set()
+        thread.join()
+
+        assert "in wait_for_the_model" in (tmp_path / "libre-dictum.faults").read_text()
 
 
 class TestListingCameras:

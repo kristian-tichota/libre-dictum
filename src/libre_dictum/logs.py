@@ -3,6 +3,7 @@ from __future__ import annotations
 import faulthandler
 import logging
 import os
+import signal
 import sys
 import threading
 import time
@@ -14,12 +15,13 @@ CONSOLE_FORMAT = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 FILE_FORMAT = "%(asctime)s %(levelname)-7s [%(threadName)s] %(name)s: %(message)s"
 FILE_BYTES = 2 * 1024 * 1024
 FILE_BACKUPS = 4
+DUMP_SIGNAL = signal.SIGUSR1
 
 logger = logging.getLogger(__name__)
 
 
 def configure(level: str, log_dir: Path | None, program: str) -> None:
-    """Log to stderr, and to rotating PROGRAM.log and crash-only PROGRAM.faults in log_dir."""
+    """Log to stderr, and to rotating PROGRAM.log and PROGRAM.faults (stack dumps) in log_dir."""
     logging.basicConfig(level=level, format=CONSOLE_FORMAT, datefmt="%H:%M:%S")
     logging.captureWarnings(True)
     sys.excepthook = _log_uncaught
@@ -40,6 +42,7 @@ def configure(level: str, log_dir: Path | None, program: str) -> None:
     faults.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} pid {os.getpid()} started\n")
     faults.flush()
     faulthandler.enable(file=faults, all_threads=True)
+    faulthandler.register(DUMP_SIGNAL, file=faults, all_threads=True, chain=False)
 
 
 def _log_uncaught(
