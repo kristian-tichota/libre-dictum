@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Protocol
 
-from . import instance
+from . import instance, scheduling
 from .control.protocol import default_socket_path as default_control_path
 from .control.service import ControlService
 from .dispatch import CommandDispatcher
@@ -322,6 +322,7 @@ class Application:
 
     def _watch_health(self) -> None:
         while not self._shutdown.wait(HEALTH_INTERVAL_SECONDS):
+            scheduling.sweep()
             try:
                 self.refresh_health()
             except Exception:  # noqa: BLE001 - the watchdog outlives everything it watches

@@ -10,7 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from . import __version__
+from . import __version__, scheduling
 from .app import DEFAULT_CONFIG_DIR, Application
 from .errors import AlreadyRunningError, CameraError, ConfigError, DeviceError
 from .logs import configure as configure_logging
@@ -607,6 +607,7 @@ def main(argv: list[str] | None = None) -> int:
     for received in (signal.SIGINT, signal.SIGTERM):
         signal.signal(received, request_shutdown)
 
+    scheduling.claim()
     app.run()
     return 0
 

@@ -51,6 +51,14 @@ Unguarded shared fields (`AudioStream.enabled`, every `failure`, `_faults`) are 
 assigned in one statement. A field that has to change together with one of them MUST NOT be added
 beside it.
 
+## Scheduling
+
+Recognizer workers and the pedal reader move themselves to `SCHED_FIFO` at the highest priority
+`RLIMIT_RTPRIO` permits. `scheduling.claim()` at startup and `sweep()` on every watchdog tick hold
+every other thread at the lowest nice `RLIMIT_NICE` permits. Every elevated thread carries
+`SCHED_RESET_ON_FORK`, so a process or thread it starts begins at nice 0 under `SCHED_OTHER`, and a
+thread is lifted at the next sweep. Work on a `SCHED_FIFO` thread MUST stay bounded.
+
 ## Shutdown
 
 `Application.stop()` proceeds in order: tracker, streams (queued audio dropped, half-transcribed

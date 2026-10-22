@@ -101,6 +101,7 @@ module = [
   "libre_dictum.meters",
   "libre_dictum.layers",
   "libre_dictum.runtime",
+  "libre_dictum.scheduling",
   "libre_dictum.logs",
   "libre_dictum.sockets",
   "libre_dictum.control.protocol",

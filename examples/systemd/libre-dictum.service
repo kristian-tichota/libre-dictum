@@ -41,6 +41,16 @@ Environment=PYTHONUNBUFFERED=1
 Restart=on-failure
 RestartSec=3
 
+# Recognizers take real-time priority and every other thread nice -20, as far as the user
+# manager's limits allow; the log says what was granted. Raising the limits needs root:
+#
+#   sudo mkdir -p /etc/systemd/system/user@.service.d
+#   printf '[Service]\nLimitRTPRIO=99\nLimitNICE=40\n' |
+#     sudo tee /etc/systemd/system/user@.service.d/realtime.conf
+#
+# and a new login. Swap is refused, so an idle model is never paged out.
+MemorySwapMax=0
+
 # SIGTERM is the shutdown path the program is written for: it types nothing, switches no mode,
 # opens no device, and releases every key and pedal it was holding.
 #

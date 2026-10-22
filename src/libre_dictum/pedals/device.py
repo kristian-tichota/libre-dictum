@@ -6,6 +6,7 @@ from collections.abc import Callable, Sequence
 
 import hid
 
+from .. import scheduling
 from ..errors import DeviceError
 from ..settings import PedalSettings
 from .reader import PedalEvent, PedalReader
@@ -57,6 +58,7 @@ class PedalWatcher:
 
     def _run(self) -> None:
         """Read pedals until asked to stop, retrying a device that may yet come back."""
+        scheduling.realtime()
         attempts = len(self._retry_delays) + 1
         for attempt, delay in enumerate((0.0, *self._retry_delays), start=1):
             if self._stop.wait(delay):

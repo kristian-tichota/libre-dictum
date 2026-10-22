@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from .. import scheduling
 from ..errors import DeviceError
 
 if TYPE_CHECKING:
@@ -103,6 +104,7 @@ class AudioStream(ABC):
         self._audio_queue.put(block)
 
     def _run(self) -> None:
+        scheduling.realtime()
         try:
             processing = False
             while not self._stop_event.is_set():

@@ -22,7 +22,7 @@ layer testable without hardware.
 
 | Layer | Modules | May import |
 |---|---|---|
-| **Pure logic** | `text`, `pattern`, `mathutil`, `pointer`, `smoothing`, `layers`, `runtime`, `control/protocol`, `input/dsl`, `input/keymap`, `audio/vad`, `audio/grammar`, `audio/partials`, `tracking/gestures`, `tracking/hands`, `tracking/takes`, `tracking/tuning`, `tracking/expressions`, `tracking/face_tuning`, `tracking/screenmap`, `tracking/cameras`, `pedals/reader`, `overlay/model`, `overlay/protocol`, `health`, `status`, `meters`, `errors` | stdlib, numpy, `errors`, `settings`' frozen dataclasses — plus `evdev.ecodes` in `keymap`, a constant table and the one exception |
+| **Pure logic** | `text`, `pattern`, `mathutil`, `pointer`, `smoothing`, `layers`, `runtime`, `scheduling`, `control/protocol`, `input/dsl`, `input/keymap`, `audio/vad`, `audio/grammar`, `audio/partials`, `tracking/gestures`, `tracking/hands`, `tracking/takes`, `tracking/tuning`, `tracking/expressions`, `tracking/face_tuning`, `tracking/screenmap`, `tracking/cameras`, `pedals/reader`, `overlay/model`, `overlay/protocol`, `health`, `status`, `meters`, `errors` | stdlib, numpy, `errors`, `settings`' frozen dataclasses — plus `evdev.ecodes` in `keymap`, a constant table and the one exception |
 | **Typed config** | `settings` | the pure layer |
 | **Adapters** | `sockets`, `control/service`, `input/devices`, `audio/*_stream`, `audio/base`, `audio/transcriber`, `tracking/{tracker,probe,capture,face_capture,screen_capture,v4l2}`, `pedals/device`, `systray`, `overlay/service`, `instance` | the pure layer, `settings` |
 | **Coordination** | `input/executor`, `modes`, `dispatch`, `streams` | everything above |

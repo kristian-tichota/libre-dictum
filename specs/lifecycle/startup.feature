@@ -149,6 +149,26 @@ Feature: Starting up
       Then the directory is created
       And the app does not crash
 
+  Rule: Recognition outranks every other program on the CPU
+
+    @accessibility-critical
+    Scenario: The recognizers run at real-time priority
+      Given the session may take real-time priority 99 and nice -20
+      When the app starts
+      Then every recognizer and the pedal reader run at real-time priority 99
+      And every other thread of the process runs at nice -20
+
+    Scenario: A program started by a command runs at normal priority
+      When a command runs "exec(firefox)"
+      Then firefox runs at nice 0 under the normal scheduling policy
+
+    @accessibility-critical
+    Scenario: A missing grant is reported with the limits to raise
+      Given the session may not take real-time priority
+      When the app starts
+      Then a warning names LimitRTPRIO and LimitNICE
+      And speech recognition still works
+
   Rule: Startup reports what it brought up
 
     @accessibility-critical
