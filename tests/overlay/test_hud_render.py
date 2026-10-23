@@ -7,7 +7,7 @@ from libre_dictum.layers import Layer, LayerState, SleepView
 from libre_dictum.meters import GestureMeter, HandReading, Microphone, Reading
 from libre_dictum.overlay import model, protocol
 from libre_dictum.overlay.hud import render
-from libre_dictum.overlay.protocol import CalibrationDot, State
+from libre_dictum.overlay.protocol import CalibrationDot, DwellRing, State
 from libre_dictum.status import HeldInput
 
 CONFIG = {
@@ -1172,3 +1172,18 @@ class TestTheCalibrationTarget:
 
     def test_the_hint_names_the_nose_and_not_the_eyes(self):
         assert "nose" in render.target_of(self.dot()).hint
+
+
+class TestTheDwellRing:
+    """What the ring surface is told to draw."""
+
+    def test_nothing_dwelling_means_nothing_to_draw(self):
+        assert render.ring_of(State(revision=1)) is None
+        assert render.ring_of(None) is None
+
+    def test_the_ring_cannot_leave_the_screen_or_overfill(self):
+        ring = render.ring_of(State(revision=1, dwell=DwellRing(x=-0.2, y=1.4, progress=1.3)))
+        assert (ring.x, ring.y, ring.progress) == (0.0, 1.0, 1.0)
+
+    def test_a_click_is_carried(self):
+        assert render.ring_of(State(revision=1, dwell=DwellRing(0.5, 0.5, 1.0, True))).clicked

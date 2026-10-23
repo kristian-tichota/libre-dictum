@@ -5,7 +5,16 @@ from dataclasses import dataclass
 from enum import StrEnum, auto
 
 from ...meters import GestureMeter, HandReading, Microphone
-from ..protocol import Catalogue, EdgeCard, GroupCard, KeyCard, ModeCard, RouteCard, State
+from ..protocol import (
+    Catalogue,
+    DwellRing,
+    EdgeCard,
+    GroupCard,
+    KeyCard,
+    ModeCard,
+    RouteCard,
+    State,
+)
 from .style import TONE_BLOCKED, TONE_LIVE, TONE_MEASURED
 
 ANCHORS = ("bottom-left", "bottom-right", "left", "right", "top-left", "top-right")
@@ -780,3 +789,17 @@ def target_of(state: State | None) -> Target | None:
         caption=f"{dot.index} of {dot.total}",
         hint="point your nose at the dot and hold still",
     )
+
+
+def ring_of(state: State | None) -> DwellRing | None:
+    """The dwell ring to draw, clamped onto the screen, or None when nothing is dwelling."""
+    if state is None or state.dwell is None:
+        return None
+    ring = state.dwell
+    return DwellRing(
+        x=_unit(ring.x), y=_unit(ring.y), progress=_unit(ring.progress), clicked=ring.clicked
+    )
+
+
+def _unit(value: float) -> float:
+    return max(0.0, min(1.0, value))

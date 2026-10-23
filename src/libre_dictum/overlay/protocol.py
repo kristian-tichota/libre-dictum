@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..health import Health
     from .model import Entry, Group, ModeView, Snapshot
 
-PROTOCOL_VERSION = 12
+PROTOCOL_VERSION = 13
 
 PAGES = ("index", "group", "modes", "pedals", "gestures")
 
@@ -164,6 +164,16 @@ class CalibrationDot:
 
 
 @dataclass(frozen=True, slots=True)
+class DwellRing:
+    """The ring around a stopped pointer, on the calibrated monitor, until it clicks."""
+
+    x: float
+    y: float
+    progress: float
+    clicked: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class KeyCard:
     """One key that is down, under the name and glyph a display draws it by."""
 
@@ -205,6 +215,7 @@ class State:
     hands: tuple[HandReading, ...] = ()
     microphone: Microphone | None = None
     dot: CalibrationDot | None = None
+    dwell: DwellRing | None = None
 
     @property
     def missed(self) -> bool:
@@ -306,6 +317,7 @@ def _state_json(state: State) -> dict[str, Any]:
         "hands": [_hand_json(hand) for hand in state.hands],
         "microphone": _microphone_json(state.microphone),
         "dot": _dot_json(state.dot),
+        "dwell": _dwell_json(state.dwell),
     }
 
 
@@ -327,6 +339,13 @@ def _dot_json(dot: CalibrationDot | None) -> list[float] | None:
     if dot is None:
         return None
     return [dot.x, dot.y, dot.index, dot.total, dot.settled]
+
+
+def _dwell_json(ring: DwellRing | None) -> list[float] | None:
+    """The dwell ring as four numbers, the last 1 once it has clicked, or None."""
+    if ring is None:
+        return None
+    return [ring.x, ring.y, ring.progress, 1 if ring.clicked else 0]
 
 
 def _meter_json(meter: GestureMeter) -> dict[str, Any]:
@@ -495,6 +514,7 @@ def _state_from(payload: Mapping[str, Any]) -> State:
         hands=tuple(_hand_from(hand) for hand in _objects(payload, "hands")),
         microphone=_microphone_from(payload.get("microphone")),
         dot=_dot_from(payload.get("dot")),
+        dwell=_dwell_from(payload.get("dwell")),
     )
 
 
@@ -528,6 +548,23 @@ def _dot_from(payload: Any) -> CalibrationDot | None:
         index=int(payload[2]),
         total=int(payload[3]),
         settled=float(payload[4]),
+    )
+
+
+def _dwell_from(payload: Any) -> DwellRing | None:
+    if payload is None:
+        return None
+    if (
+        not isinstance(payload, list)
+        or len(payload) != 4
+        or not all(isinstance(v, int | float) and not isinstance(v, bool) for v in payload)
+    ):
+        raise ProtocolError(f"'dwell' is {payload!r}, not four numbers")
+    return DwellRing(
+        x=float(payload[0]),
+        y=float(payload[1]),
+        progress=float(payload[2]),
+        clicked=bool(payload[3]),
     )
 
 
@@ -796,6 +833,7 @@ def state_of(
     sheet: bool = False,
     page: str = PAGES[0],
     dot: CalibrationDot | None = None,
+    dwell: DwellRing | None = None,
 ) -> State:
     """The state frame for one snapshot."""
     return State(
@@ -816,6 +854,7 @@ def state_of(
         matched=snapshot.heard.matched,
         nearest=snapshot.heard.nearest,
         dot=dot,
+        dwell=dwell,
         chip=chip,
         sheet=sheet,
         page=page,

@@ -2,6 +2,7 @@ import pytest
 
 from libre_dictum.errors import ConfigError
 from libre_dictum.layers import Layer
+from libre_dictum.settings import DwellSettings
 from libre_dictum.tracking.hands import Calibration
 
 MINIMAL = {"modes": {"root": {"type": "vosk", "path": "m"}}}
@@ -977,6 +978,45 @@ class TestTheControlLaw:
         data = self.config("absolute")
         data["modes"]["root"].update({"ht_dead_angle_h": 30.0, "ht_full_speed_angle": 5.0})
         assert settings_of(data).modes["root"].pointer.law == "absolute"
+
+    def test_no_mode_dwells_unless_asked(self, settings_of):
+        assert settings_of(self.config("absolute")).modes["root"].pointer.dwell is None
+
+    def test_a_dwell_takes_its_angles_from_the_defaults(self, settings_of):
+        data = self.config("absolute")
+        data["modes"]["root"]["ht_dwell_seconds"] = 1.0
+        assert settings_of(data).modes["root"].pointer.dwell == DwellSettings(seconds=1.0)
+
+    def test_a_dwell_under_the_rate_law_is_refused_by_mode_name(self, settings_of):
+        data = self.config("rate")
+        data["modes"]["root"]["ht_dwell_seconds"] = 0.8
+        with pytest.raises(ConfigError, match="'root' sets 'ht_dwell_seconds' under the 'rate'"):
+            settings_of(data)
+
+    def test_an_inherited_dwell_is_refused_in_a_rate_mode_until_it_says_null(self, settings_of):
+        data = self.config("absolute")
+        data["ht_dwell_seconds"] = 0.8
+        data["modes"]["slow"] = {
+            "type": "vosk",
+            "path": "m",
+            "ht_enabled": True,
+            "ht_pointer_law": "rate",
+        }
+        with pytest.raises(ConfigError, match="'slow'"):
+            settings_of(data)
+
+        data["modes"]["slow"]["ht_dwell_seconds"] = None
+        assert settings_of(data).modes["slow"].pointer.dwell is None
+
+    @pytest.mark.parametrize(
+        "key,value",
+        [("ht_dwell_seconds", 0), ("ht_dwell_angle", 0), ("ht_dwell_arrival_angle", -1)],
+    )
+    def test_a_dwell_that_cannot_click_is_refused(self, settings_of, key, value):
+        data = self.config("absolute")
+        data["modes"]["root"].update({"ht_dwell_seconds": 0.8, key: value})
+        with pytest.raises(ConfigError, match=key):
+            settings_of(data)
 
 
 class TestTheScreenCalibration:

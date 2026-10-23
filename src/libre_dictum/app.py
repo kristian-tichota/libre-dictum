@@ -13,10 +13,12 @@ from . import instance, scheduling
 from .control.protocol import default_socket_path as default_control_path
 from .control.service import ControlService
 from .dispatch import CommandDispatcher
+from .dwell import CLICK, Dwell
 from .health import HAND_SUBSYSTEM, HEAD_SUBSYSTEM, FaultIndicator, Health, HealthMonitor
 from .input.devices import InputBackend, UinputBackend
 from .input.dsl import runnable_while_asleep
 from .input.executor import InputExecutor
+from .input.keymap import MOUSE_MAP
 from .layers import (
     Confirmation,
     Layer,
@@ -29,7 +31,7 @@ from .layers import (
 from .meters import GestureMeter, HandReading, Microphone
 from .modes import ModeIndicator, ModeManager
 from .overlay import model
-from .overlay.protocol import default_socket_path
+from .overlay.protocol import DwellRing, default_socket_path
 from .overlay.service import HudService
 from .pedals.reader import TapRuns
 from .pointer import AbsolutePointer, PointerFilter
@@ -144,6 +146,10 @@ class Application:
         self._taps = TapRuns(tap_ms=windows.tap_ms, sequence_ms=windows.sequence_ms)
         self._held: dict[tuple[Layer, str], tuple[ModeSettings, EdgeBinding]] = {}
         self._held_lock = threading.Lock()
+        self._dwell: Dwell | None = None
+        self._dwell_at = 0.0
+        self._dwell_ring: DwellRing | None = None
+        self._button_held = False
 
         self.executor = InputExecutor(
             backend,
@@ -350,6 +356,7 @@ class Application:
     def _on_held(self, held: HeldInput) -> None:
         """Held input changed: say so, and show it."""
         logger.info("Held input: %s", held.summary() or "nothing")
+        self._button_held = any(key.lower() in MOUSE_MAP for key in held.held)
         self._show_held(held)
 
     def _show_held(self, held: HeldInput) -> None:
@@ -407,12 +414,14 @@ class Application:
         """One smoothed head pose."""
         mode = self.modes.active_mode
         if mode is None or self.asleep():
+            self._end_dwell()
             return
 
         if mode.pointer.law == POINTER_ABSOLUTE:
-            self._point_absolutely(mode, absolute_yaw, absolute_pitch)
+            self._point_absolutely(mode, absolute_yaw, absolute_pitch, dt)
             return
 
+        self._end_dwell()
         pointer = PointerFilter(mode.pointer)
         movement = pointer.filter(yaw, pitch, dt)
         if movement is not None:
@@ -420,16 +429,56 @@ class Application:
         elif pointer.at_rest(yaw, pitch):
             self._absorb_drift(yaw, pitch, dt)
 
-    def _point_absolutely(self, mode: ModeSettings, yaw: float, pitch: float) -> None:
-        """Put the pointer where the head is pointing."""
+    def _point_absolutely(self, mode: ModeSettings, yaw: float, pitch: float, dt: float) -> None:
+        """Put the pointer where the head is pointing, or where it stopped."""
         head_tracking = self.settings.head_tracking
         if head_tracking is None:
             return
-        position = AbsolutePointer(mode.pointer, head_tracking.screen, head_tracking.placement).at(
-            yaw, pitch
-        )
-        if position is not None:
-            self.backend.move_absolute(*position)
+        pointer = AbsolutePointer(mode.pointer, head_tracking.screen, head_tracking.placement)
+        dwell = self._dwell_for(mode, dt)
+        step = None
+        if dwell is not None:
+            self._dwell_at += dt
+            step = dwell.feed(
+                self._dwell_at, yaw, pitch, typed=self.executor.typed, held=self._button_held
+            )
+            yaw, pitch = step.yaw, step.pitch
+
+        point = pointer.on_screen(yaw, pitch)
+        if point is None:
+            self._show_dwell(None)
+            return
+        self.backend.move_absolute(*pointer.placement.into_desktop(*point))
+        if step is None:
+            return
+        ring = None if step.ring is None else DwellRing(*point, step.ring, step.clicked)
+        self._show_dwell(ring)
+        if step.click and not self._shutdown.is_set():
+            logger.info("Dwell click at %.3f, %.3f of the screen", *point)
+            self._perform(mode, CLICK, Layer.GESTURE)
+
+    def _dwell_for(self, mode: ModeSettings, dt: float) -> Dwell | None:
+        """The dwell this mode clicks with, new after a gap, or None while it has none."""
+        settings = mode.pointer.dwell
+        if settings is None or self.asleep(Layer.GESTURE):
+            self._end_dwell()
+            return None
+        if self._dwell is None or self._dwell.settings != settings or dt <= 0:
+            self._end_dwell()
+            self._dwell = Dwell(settings)
+        return self._dwell
+
+    def _end_dwell(self) -> None:
+        """Drop the dwell and take its ring off screen."""
+        self._dwell = None
+        self._show_dwell(None)
+
+    def _show_dwell(self, ring: DwellRing | None) -> None:
+        if ring == self._dwell_ring:
+            return
+        self._dwell_ring = ring
+        if self.hud is not None:
+            _tell(DISPLAY_SUBSYSTEM, partial(self.hud.set_dwell, ring))
 
     def _absorb_drift(self, yaw: float, pitch: float, dt: float) -> None:
         """Let neutral follow the resting pose, if the user asked for that."""

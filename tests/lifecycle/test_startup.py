@@ -81,6 +81,20 @@ PAIRED_CONFIG = {
 }
 
 
+DWELL_CONFIG = {
+    **ABSOLUTE_CONFIG,
+    "modes": {
+        "mouse mode": {"type": "vosk", "path": "m", "ht_enabled": True, "ht_dwell_seconds": 0.8},
+        "precision mode": {
+            "type": "vosk",
+            "path": "m",
+            "ht_enabled": True,
+            "ht_pointer_law": "rate",
+        },
+    },
+}
+
+
 def _absolute_app(backend, tmp_path, monkeypatch, config=ABSOLUTE_CONFIG):
     """An application whose one mode points the head at the screen."""
     monkeypatch.setattr(Application, "_create_pedals", lambda self, settings: None)
@@ -380,6 +394,69 @@ class TestHeadTrackingCallbacks:
         app._on_gesture("letting_go", False)
 
         assert backend.sequence == "esc↓ esc↑"
+
+
+class TestDwellClick:
+    @pytest.fixture
+    def app(self, backend, tmp_path, monkeypatch):
+        application = _absolute_app(backend, tmp_path, monkeypatch, DWELL_CONFIG)
+        application.start()
+        return application
+
+    def point(self, app, poses, *, fresh=False):
+        for index, yaw in enumerate(poses):
+            app._on_rotation(0.0, 0.0, 0.0 if fresh and index == 0 else 1 / 60, yaw, 0.0)
+
+    def dwell(self, app, seconds=0.9):
+        """A ten-degree turn from the first pose seen, then the head still for seconds."""
+        turn = [-10.0 * i / 15 for i in range(15)]
+        self.point(app, turn + [-10.0] * round(seconds * 60), fresh=True)
+
+    def test_a_stop_after_a_move_clicks_and_holds_the_pointer_there(self, app, backend):
+        self.dwell(app)
+
+        assert backend.sequence == "left_mouse↓ left_mouse↑"
+        assert len(set(backend.positions[-20:])) == 1
+
+    def test_the_display_sees_the_ring_fill_flash_and_go(self, app):
+        rings = []
+        app.hud = SimpleNamespace(set_dwell=rings.append, set_held=lambda held: None)
+
+        self.dwell(app)
+        self.point(app, [-5.0])
+
+        progress = [ring.progress for ring in rings[:-2]]
+        assert progress == sorted(progress) and 0.0 < progress[-1] < 1.0
+        assert rings[-2].clicked
+        assert rings[-1] is None
+
+    def test_a_held_mouse_button_keeps_it_from_clicking(self, app, backend):
+        app.executor.execute("hold(right_mouse)")
+        backend.clear()
+
+        self.dwell(app)
+
+        assert backend.events == []
+
+    def test_a_sleeping_gesture_layer_keeps_it_from_clicking(self, app, backend):
+        app._request_sleep("gesture", True)
+        app._request_sleep("gesture", True)
+
+        self.dwell(app)
+
+        assert backend.events == []
+        assert backend.positions
+
+    def test_switching_to_the_rate_law_takes_the_ring_away(self, app):
+        rings = []
+        app.hud = SimpleNamespace(set_dwell=rings.append, set_held=lambda held: None)
+        self.dwell(app, seconds=0.6)
+
+        app.modes.switch("precision mode")
+        app._on_rotation(0.0, 0.0, 1 / 60, -10.0, 0.0)
+
+        assert rings[-2] is not None
+        assert rings[-1] is None
 
 
 class TestPedalCallbacks:

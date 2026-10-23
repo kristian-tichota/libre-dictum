@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum, auto
+
+from ..protocol import DwellRing
+
 SIDES = ("left", "right")
 
 DEFAULT_SIDE = "right"
@@ -7,6 +12,14 @@ DEFAULT_SIDE = "right"
 DURATION_MS = 180.0
 
 EPSILON = 0.5
+
+FLASH_MS = 260.0
+
+FADE_MS = 160.0
+
+STALE_MS = 250.0
+
+FLASH_SPREAD = 0.8
 
 
 def side(anchor: str) -> str:
@@ -72,3 +85,79 @@ class Slide:
         else:
             self._value = self._from + (self._to - self._from) * ease(elapsed / self.duration)
         return self._value
+
+
+class _Phase(Enum):
+    FILLING = auto()
+    FLASHING = auto()
+    FADING = auto()
+    SPENT = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class RingFrame:
+    """One painted ring: where, how full, how opaque, and its radius as a multiple."""
+
+    x: float
+    y: float
+    progress: float
+    alpha: float
+    spread: float = 1.0
+
+
+class RingMotion:
+    """The dwell ring between the frames that describe it: filling, flashing, fading."""
+
+    def __init__(self) -> None:
+        self._phase: _Phase | None = None
+        self._ring: DwellRing | None = None
+        self._since = 0.0
+
+    @property
+    def busy(self) -> bool:
+        """Whether anything is drawn or about to change without a new frame."""
+        return self._phase in (_Phase.FILLING, _Phase.FLASHING, _Phase.FADING)
+
+    def show(self, ring: DwellRing | None, *, now: float) -> None:
+        """Take the ring a frame described, or None once nothing is dwelling."""
+        phase = self._phase
+        if ring is None:
+            if phase is _Phase.FILLING:
+                self._enter(_Phase.FADING, now)
+            elif phase is _Phase.SPENT:
+                self._phase = None
+            return
+        if ring.clicked:
+            if phase not in (_Phase.FLASHING, _Phase.SPENT):
+                self._ring = ring
+                self._enter(_Phase.FLASHING, now)
+            return
+        if phase is not _Phase.FILLING or ring != self._ring:
+            self._ring = ring
+            self._enter(_Phase.FILLING, now)
+
+    def frame(self, now: float) -> RingFrame | None:
+        """What to paint at now, in milliseconds on the clock show was given."""
+        ring = self._ring
+        if ring is None or self._phase in (None, _Phase.SPENT):
+            return None
+        elapsed = max(0.0, now - self._since)
+        if self._phase is _Phase.FILLING:
+            if elapsed <= STALE_MS:
+                return RingFrame(ring.x, ring.y, ring.progress, 1.0)
+            self._enter(_Phase.FADING, now)
+            elapsed = 0.0
+        if self._phase is _Phase.FADING:
+            if elapsed >= FADE_MS:
+                self._phase = None
+                return None
+            return RingFrame(ring.x, ring.y, ring.progress, 1.0 - elapsed / FADE_MS)
+        if elapsed >= FLASH_MS:
+            self._phase = _Phase.SPENT
+            return None
+        fraction = elapsed / FLASH_MS
+        return RingFrame(ring.x, ring.y, 1.0, 1.0 - fraction, 1.0 + FLASH_SPREAD * ease(fraction))
+
+    def _enter(self, phase: _Phase, now: float) -> None:
+        self._phase = phase
+        self._since = now

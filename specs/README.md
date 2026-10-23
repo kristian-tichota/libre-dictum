@@ -171,3 +171,10 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     when the utterance will be sent. The toggle itself is untouched, so the chip goes back off once
     the voice layer leaves the mode, and a full sleep that takes the display (decision 30) still
     takes it.
+34. **A dwell clicks an arrival, once, and only under the absolute law.** A head pauses while it
+    reads and while it rests, and no stillness threshold separates those pauses from a deliberate
+    one, so a stop clicks only when the head travelled to it within the preceding second. A stop
+    clicks once, the pointer is held at the stop's mean while the ring is drawn, and the ring is
+    drawn only over the second half of the dwell, because most stops that qualify are left before
+    they click. Only the absolute law knows where the pointer is, so a dwell beside the rate law is
+    a load error. The click is a left click; other buttons stay on their own bindings.

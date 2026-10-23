@@ -349,9 +349,12 @@ and 16 s, enumerating again each time, after which the reload phrase is the reco
 | `ht_max_speed_px_per_sec` | number | `800.0` | The top speed itself, per **second**. |
 | `ht_speed_power` | number | `1.5` | A value above 1 gives slow movement near the dead zone and faster movement further out. |
 | `ht_invert_x`, `ht_invert_y` | boolean | `false` | |
+| `ht_dwell_seconds` | number or `null` | `null` | Seconds a stopped head waits before it clicks. See [Dwell click](#dwell-click). |
+| `ht_dwell_angle` | number | `0.65` | Degrees the head may wander while it counts as stopped. |
+| `ht_dwell_arrival_angle` | number | `6.5` | Degrees the head MUST have travelled in the second before the stop. `0` lets any stop click. |
 
-Every setting except `ht_enabled`, `ht_pointer_law` and the two inversions describes the **rate**
-law and is ignored under `absolute`.
+The three dwell settings apply only under `absolute`. Every other setting except `ht_enabled`,
+`ht_pointer_law` and the two inversions describes the **rate** law and is ignored under `absolute`.
 
 ```
 speed = ht_max_speed_px_per_sec · ((angle − dead) / (ht_full_speed_angle − dead)) ^ ht_speed_power
@@ -392,6 +395,28 @@ motion passes through libinput's pointer acceleration, which would amplify a fas
 overshoot. `recenter()` and `ht_auto_recenter_seconds` have no effect under it, and setting the
 latter beside an absolute mode is a load error, because both move neutral and a screen does not
 drift.
+
+#### Dwell click
+
+A mode with `ht_dwell_seconds` left-clicks where the head stops. A stop is a pose that stays within
+`ht_dwell_angle` of its own running mean, and it clicks only when it **arrives**: the head MUST have
+been at least `ht_dwell_arrival_angle` away at some point in the second before the stop began. A
+drift or a small shift therefore never clicks, while a deliberate move followed by a correction
+does. Each stop clicks once, and another click needs the head to leave the stop and arrive again.
+
+For the first half of the dwell nothing is drawn. In the second half a ring fills around the
+pointer, and the pointer moves onto the stop's mean pose and is held there, so the click lands at
+the ring's centre without the absolute law's shimmer. The ring flashes on the click and fades if
+the head leaves first. A stop does not click when a mouse button is held, when anything other than
+a modifier was typed or clicked during it, or while the gesture layer is asleep. Each click is
+logged at INFO with its position.
+
+A dwell needs the absolute law, because only that law knows where the pointer is, so a dwell setting
+in an enabled rate mode is a load error, including one inherited from the top level.
+
+```json
+"mouse mode": { "ht_enabled": true, "ht_pointer_law": "absolute", "ht_dwell_seconds": 0.8 }
+```
 
 ### Screen calibration
 
@@ -740,6 +765,7 @@ The following conditions are checked at load.
 - `icon` is three 0–255 values.
 - `ht_full_speed_angle` is outside the dead angle.
 - An absolute mode has a calibration and no `ht_auto_recenter_seconds`.
+- A dwell is positive, and set only in modes under the absolute law.
 - `ht_face_baseline` holds only blendshapes below 1.
 - No `ht_hand_calibration` pair has coinciding ends, and unknown `ht_*` keys are rejected.
 - `overlay.sheet.navigate` is one word, and `overlay.output.name` is a non-empty string or null.

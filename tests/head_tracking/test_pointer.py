@@ -2,8 +2,9 @@ import math
 
 import pytest
 
+from libre_dictum.dwell import Dwell
 from libre_dictum.pointer import AbsolutePointer, PointerFilter
-from libre_dictum.settings import PointerSettings
+from libre_dictum.settings import DwellSettings, PointerSettings
 from libre_dictum.tracking.screenmap import WHOLE_DESKTOP, ScreenBounds, ScreenMap
 
 DT = 1 / 60
@@ -237,3 +238,103 @@ class TestAbsolutePointer:
     def test_the_pose_it_takes_is_the_one_it_is_given(self):
         pointer = self.pointer(self.RIGHT_HALF)
         assert pointer.at(12.0, -4.0) == pointer.at(12.0, -4.0)
+
+
+class TestDwell:
+    """Where a stopped head clicks, and when it must not."""
+
+    def run(self, poses, dwell=None, start=0, **feed):
+        dwell = dwell or Dwell(DwellSettings())
+        return [
+            dwell.feed((start + i) * DT, yaw, pitch, **feed) for i, (yaw, pitch) in enumerate(poses)
+        ]
+
+    def turn(self, degrees=10.0, start=0.0):
+        """A turn at 40 degrees a second, every frame further than the stop radius."""
+        frames = round(abs(degrees) / 40.0 * 60)
+        return [(start + degrees * i / frames, 0.0) for i in range(frames)]
+
+    def still(self, seconds, yaw=10.0, wander=0.0):
+        return [(yaw + wander * (-1) ** i, 0.0) for i in range(round(seconds * 60))]
+
+    def clicks(self, steps):
+        return sum(step.click for step in steps)
+
+    def test_a_stop_after_a_deliberate_move_clicks_once(self):
+        assert self.clicks(self.run(self.turn() + self.still(0.9))) == 1
+
+    def test_the_click_waits_for_the_whole_dwell(self):
+        assert self.clicks(self.run(self.turn() + self.still(0.75))) == 0
+
+    def test_a_stop_that_nothing_led_up_to_never_clicks(self):
+        steps = self.run(self.still(3.0, yaw=5.0))
+        assert self.clicks(steps) == 0
+        assert all(step.ring is None for step in steps)
+
+    def test_a_drift_smaller_than_the_arrival_never_clicks(self):
+        steps = self.run(self.turn(5.0) + self.still(3.0, yaw=5.0))
+        assert self.clicks(steps) == 0
+
+    def test_holding_still_after_the_click_does_not_click_again(self):
+        assert self.clicks(self.run(self.turn() + self.still(3.0))) == 1
+
+    def test_leaving_before_the_dwell_ends_takes_the_ring_away(self):
+        steps = self.run(self.turn() + self.still(0.6) + [(12.0, 0.0)])
+        assert steps[-2].ring is not None
+        assert steps[-1].ring is None
+        assert self.clicks(steps) == 0
+
+    def test_a_correction_just_after_the_move_still_clicks(self):
+        steps = self.run(self.turn() + self.still(0.3) + self.still(0.9, yaw=11.5))
+        assert self.clicks(steps) == 1
+        assert [step.yaw for step in steps if step.click] == [pytest.approx(11.5)]
+
+    def test_the_ring_fills_over_the_second_half_of_the_dwell(self):
+        travel = self.turn()
+        steps = self.run(travel + self.still(0.6))
+        assert steps[len(travel) + 18].ring is None
+        assert steps[-1].ring == pytest.approx(0.5, abs=0.05)
+
+    def test_before_the_ring_the_pointer_follows_the_head(self):
+        travel = self.turn()
+        poses = travel + self.still(0.3, wander=0.3)
+        steps = self.run(poses)
+        assert [step.yaw for step in steps] == [yaw for yaw, _ in poses]
+
+    def test_while_the_ring_fills_the_pointer_is_held_at_the_mean(self):
+        steps = self.run(self.turn() + self.still(0.9, wander=0.3))
+        held = [step for step in steps if step.ring is not None and step.ring > 0.3]
+        assert held
+        assert all(step.yaw == pytest.approx(10.0, abs=0.02) for step in held)
+
+    def test_the_click_lands_where_the_pointer_was_held(self):
+        steps = self.run(self.turn() + self.still(0.9, wander=0.3))
+        (click,) = [step for step in steps if step.click]
+        assert click.yaw == pytest.approx(10.0, abs=0.02)
+        assert click.clicked
+
+    def test_a_held_mouse_button_keeps_it_from_clicking(self):
+        steps = self.run(self.turn() + self.still(0.9), held=True)
+        assert self.clicks(steps) == 0
+        assert all(step.ring is None for step in steps)
+
+    def test_input_during_the_stop_keeps_it_from_clicking(self):
+        dwell = Dwell(DwellSettings())
+        travel = self.turn()
+        self.run(travel + self.still(0.3), dwell=dwell, typed=4)
+        later = self.run(self.still(0.6), dwell=dwell, start=len(travel) + 18, typed=6)
+        assert self.clicks(later) == 0
+
+    def test_input_before_the_stop_does_not(self):
+        assert self.clicks(self.run(self.turn() + self.still(0.9), typed=9)) == 1
+
+    def test_a_gap_forgets_the_move_before_it(self):
+        dwell = Dwell(DwellSettings())
+        travel = self.turn()
+        self.run(travel, dwell=dwell)
+        after = self.run(self.still(0.9), dwell=dwell, start=len(travel) + 12)
+        assert self.clicks(after) == 0
+
+    def test_an_arrival_angle_of_zero_lets_any_stop_click(self):
+        steps = self.run(self.still(0.9, yaw=5.0), Dwell(DwellSettings(arrival=0.0)))
+        assert self.clicks(steps) == 1

@@ -19,6 +19,10 @@ TONE_MEASURED = "detail"
 
 HEARING_RGB = (127, 209, 160)
 
+RING_RGB = (115, 204, 255)
+
+RING_RADIUS = 20
+
 WAVE_LOUD = (*(channel / 255 for channel in HEARING_RGB), 1.0)
 WAVE_QUIET = (232 / 255, 232 / 255, 234 / 255, 0.35)
 
@@ -51,6 +55,11 @@ box.surface {{
   border: 1px solid rgba(255, 255, 255, {edge});
   border-radius: 10px;
   padding: 8px 12px;
+}}
+box.surface.dwell {{
+  background-color: transparent;
+  border: none;
+  padding: 0;
 }}
 /* The shadow is what is left to read the text against once the panel is turned down. */
 label {{

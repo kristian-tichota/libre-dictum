@@ -1059,6 +1059,16 @@ class TestTheCalibrationDot:
 
         assert one.state_where(lambda s: s.dot is not None and s.dot.settled == 1.0)
 
+    def test_a_dwell_ring_reaches_the_display_where_it_was_put(self, service, display):
+        one = display()
+        one.catalogue()
+        one.state()
+
+        service.set_dwell(protocol.DwellRing(x=0.3, y=0.6, progress=0.25))
+
+        ring = one.state_where(lambda state: state.dwell is not None).dwell
+        assert (ring.x, ring.y, ring.progress, ring.clicked) == (0.3, 0.6, 0.25, False)
+
     def test_clearing_it_takes_the_surface_away(self, service, display):
         one = display()
         one.catalogue()

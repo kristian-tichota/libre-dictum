@@ -95,6 +95,7 @@ module = [
   "libre_dictum.text",
   "libre_dictum.mathutil",
   "libre_dictum.pointer",
+  "libre_dictum.dwell",
   "libre_dictum.smoothing",
   "libre_dictum.health",
   "libre_dictum.status",

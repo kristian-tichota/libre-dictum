@@ -270,6 +270,8 @@ _NON_DEFAULT: dict[str, object] = {
     "group": "focus",
     "held_gestures": ("fist",),
     "microphone": Microphone(levels=(0.25, 0.5), gate=0.4, recording=True, quiet=0.5, patience=2),
+    "dot": protocol.CalibrationDot(x=0.1, y=0.9, index=2, total=9, settled=0.5),
+    "dwell": protocol.DwellRing(x=0.25, y=0.75, progress=0.5, clicked=True),
 }
 
 

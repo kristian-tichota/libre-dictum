@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from libre_dictum.overlay.hud import motion, render
-from libre_dictum.overlay.hud.motion import Slide
+from libre_dictum.overlay.hud.motion import RingMotion, Slide
+from libre_dictum.overlay.protocol import DwellRing
 
 WINDOW = Path(__file__).parents[2] / "src" / "libre_dictum" / "overlay" / "hud" / "window.py"
 
@@ -164,6 +165,67 @@ class TestTheSlide:
 
     def test_the_duration_is_one_movement_and_not_a_journey(self):
         assert 80.0 <= motion.DURATION_MS <= 400.0
+
+
+class TestTheDwellRing:
+    """The ring between frames: what a display paints while the core says nothing new."""
+
+    def ring(self, progress=0.5, clicked=False):
+        return DwellRing(x=0.4, y=0.6, progress=progress, clicked=clicked)
+
+    def test_a_filling_ring_is_painted_as_it_was_described(self):
+        rings = RingMotion()
+        rings.show(self.ring(0.5), now=0.0)
+
+        frame = rings.frame(10.0)
+        assert (frame.x, frame.y, frame.progress, frame.alpha) == (0.4, 0.6, 0.5, 1.0)
+        assert rings.busy
+
+    def test_a_ring_taken_away_fades_rather_than_vanishing(self):
+        rings = RingMotion()
+        rings.show(self.ring(0.5), now=0.0)
+        rings.show(None, now=100.0)
+
+        assert 0.0 < rings.frame(100.0 + motion.FADE_MS / 2).alpha < 1.0
+        assert rings.frame(100.0 + motion.FADE_MS + 1) is None
+        assert not rings.busy
+
+    def test_a_click_flashes_outward_once_and_then_draws_nothing(self):
+        rings = RingMotion()
+        rings.show(self.ring(0.9), now=0.0)
+        rings.show(self.ring(1.0, clicked=True), now=20.0)
+
+        flash = rings.frame(20.0 + motion.FLASH_MS / 2)
+        assert flash.progress == 1.0 and flash.spread > 1.0 and flash.alpha < 1.0
+        assert rings.frame(20.0 + motion.FLASH_MS + 1) is None
+        rings.show(self.ring(1.0, clicked=True), now=400.0)
+        assert rings.frame(401.0) is None
+
+    def test_a_ring_the_core_stopped_describing_fades_by_itself(self):
+        rings = RingMotion()
+        rings.show(self.ring(0.5), now=0.0)
+        rings.show(self.ring(0.5), now=motion.STALE_MS)
+
+        assert rings.frame(motion.STALE_MS - 1).alpha == 1.0
+        assert rings.frame(motion.STALE_MS + 1).alpha == 1.0
+        assert rings.frame(motion.STALE_MS + motion.FADE_MS + 2) is None
+
+    def test_every_click_flashes_even_one_seen_only_as_clicked(self):
+        rings = RingMotion()
+        rings.show(self.ring(1.0, clicked=True), now=0.0)
+        rings.frame(motion.FLASH_MS + 1)
+        rings.show(None, now=500.0)
+        rings.show(self.ring(1.0, clicked=True), now=900.0)
+
+        assert rings.frame(901.0).spread > 1.0
+
+    def test_a_new_stop_after_a_click_fills_again(self):
+        rings = RingMotion()
+        rings.show(self.ring(1.0, clicked=True), now=0.0)
+        rings.frame(motion.FLASH_MS + 1)
+        rings.show(self.ring(0.1), now=600.0)
+
+        assert rings.frame(601.0).progress == 0.1
 
 
 class TestTheWindowUsesIt:

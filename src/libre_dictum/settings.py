@@ -156,6 +156,15 @@ POINTER_LAWS = (POINTER_RATE, POINTER_ABSOLUTE)
 
 
 @dataclass(frozen=True, slots=True)
+class DwellSettings:
+    """When a stopped head clicks: seconds still, and the two angles in degrees."""
+
+    seconds: float = 0.8
+    radius: float = 0.65
+    arrival: float = 6.5
+
+
+@dataclass(frozen=True, slots=True)
 class PointerSettings:
     """Per-mode head-to-pointer response curve."""
 
@@ -168,6 +177,7 @@ class PointerSettings:
     max_speed_px_per_sec: float = 800.0
     invert_x: bool = False
     invert_y: bool = False
+    dwell: DwellSettings | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -770,6 +780,9 @@ _POINTER_KEYS = frozenset(
         "max_speed_px_per_sec",
         "invert_x",
         "invert_y",
+        "dwell_seconds",
+        "dwell_angle",
+        "dwell_arrival_angle",
     }
 )
 
@@ -837,8 +850,19 @@ def _check_head_tracking_keys(
 
 
 def _pointer(raw: dict[str, Any], defaults: dict[str, Any], mode_name: str) -> PointerSettings:
-    def knob(key: str, fallback: float | bool | str) -> Any:
+    def knob(key: str, fallback: float | bool | str | None) -> Any:
         return raw.get(f"ht_{key}", defaults.get(f"ht_{key}", fallback))
+
+    dwell_seconds = knob("dwell_seconds", None)
+    dwell = (
+        None
+        if dwell_seconds is None
+        else DwellSettings(
+            seconds=float(dwell_seconds),
+            radius=float(knob("dwell_angle", DwellSettings().radius)),
+            arrival=float(knob("dwell_arrival_angle", DwellSettings().arrival)),
+        )
+    )
 
     settings = PointerSettings(
         enabled=bool(raw.get("ht_enabled", False)),
@@ -850,6 +874,7 @@ def _pointer(raw: dict[str, Any], defaults: dict[str, Any], mode_name: str) -> P
         max_speed_px_per_sec=float(knob("max_speed_px_per_sec", 800.0)),
         invert_x=bool(knob("invert_x", False)),
         invert_y=bool(knob("invert_y", False)),
+        dwell=dwell,
     )
     _check_pointer(settings, mode_name)
     return settings
@@ -862,6 +887,7 @@ def _check_pointer(settings: PointerSettings, mode_name: str) -> None:
             f"Mode {mode_name!r} has 'ht_pointer_law' of {settings.law!r}. It is one of "
             f"{', '.join(repr(law) for law in POINTER_LAWS)}."
         )
+    _check_dwell(settings, mode_name)
     if settings.law == POINTER_ABSOLUTE:
         return
     widest_dead_angle = max(settings.dead_angle_h, settings.dead_angle_v)
@@ -885,6 +911,30 @@ def _check_pointer(settings: PointerSettings, mode_name: str) -> None:
             raise ConfigError(
                 f"Mode {mode_name!r} has {key!r} of {value:g}; it cannot be negative."
             )
+
+
+def _check_dwell(settings: PointerSettings, mode_name: str) -> None:
+    """Reject a dwell that cannot click, or one under a law that never knows the position."""
+    dwell = settings.dwell
+    if dwell is None:
+        return
+    for key, value in (
+        ("ht_dwell_seconds", dwell.seconds),
+        ("ht_dwell_angle", dwell.radius),
+    ):
+        if value <= 0:
+            raise ConfigError(f"Mode {mode_name!r} has {key!r} of {value:g}; it must be positive.")
+    if dwell.arrival < 0:
+        raise ConfigError(
+            f"Mode {mode_name!r} has 'ht_dwell_arrival_angle' of {dwell.arrival:g}; it cannot be "
+            "negative. 0 lets any stop click."
+        )
+    if settings.enabled and settings.law != POINTER_ABSOLUTE:
+        raise ConfigError(
+            f"Mode {mode_name!r} sets 'ht_dwell_seconds' under the {settings.law!r} law. A dwell "
+            "click needs 'ht_pointer_law': 'absolute', because only that law knows where the "
+            "pointer is. Set it in the absolute mode alone, or 'ht_dwell_seconds': null here."
+        )
 
 
 def _build_mode(

@@ -122,6 +122,7 @@ class HudService:
         self._hands: tuple[HandReading, ...] = ()
         self._microphone: Microphone | None = None
         self._dot: protocol.CalibrationDot | None = None
+        self._dwell: protocol.DwellRing | None = None
         self._meters_on = True
         self._chip = chip
         self._sheet = Sheet(open_at_start=sheet)
@@ -296,6 +297,12 @@ class HudService:
         """Show one calibration dot, or None to take the surface away."""
         with self._lock:
             self._dot = dot
+        self._publish()
+
+    def set_dwell(self, ring: protocol.DwellRing | None) -> None:
+        """Show the ring around a stopped pointer, or None to take it away."""
+        with self._lock:
+            self._dwell = ring
         self._publish()
 
     def set_held(self, held: HeldInput) -> None:
@@ -499,6 +506,7 @@ class HudService:
             sheet=self._sheet.visible and not self._dark,
             page=str(self._sheet.page),
             dot=self._dot,
+            dwell=None if self._dark else self._dwell,
         )
 
     @property

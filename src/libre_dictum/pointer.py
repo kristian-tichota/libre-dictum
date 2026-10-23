@@ -65,7 +65,12 @@ class AbsolutePointer:
         return self.settings.enabled and self.mapping.measured
 
     def at(self, yaw: float, pitch: float) -> tuple[float, float] | None:
-        """Where the pointer belongs, in normalised screen coordinates, or None."""
+        """Where the pointer belongs, in normalised desktop coordinates, or None."""
+        point = self.on_screen(yaw, pitch)
+        return None if point is None else self.placement.into_desktop(*point)
+
+    def on_screen(self, yaw: float, pitch: float) -> tuple[float, float] | None:
+        """Where the pointer belongs on the calibrated monitor, normalised, or None."""
         if not self.usable:
             return None
         x, y = self.mapping.at(yaw, pitch)
@@ -73,4 +78,4 @@ class AbsolutePointer:
             x = 1.0 - x
         if self.settings.invert_y:
             y = 1.0 - y
-        return self.placement.into_desktop(x, y)
+        return x, y

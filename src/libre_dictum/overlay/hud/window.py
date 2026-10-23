@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ..protocol import default_socket_path
+from ..protocol import DwellRing, default_socket_path
 from . import compositor, motion, render, style
 from .client import HudClient
 
@@ -399,7 +399,7 @@ class CalibrationSurface(Surface):
         context.paint()
 
         if target.settled > 0.0:
-            context.set_source_rgba(0.45, 0.80, 1.0, 0.9)
+            context.set_source_rgba(*_rgb(style.RING_RGB), 0.9)
             context.set_line_width(radius * 0.5)
             start = -math.pi / 2
             context.arc(x, y, radius * 2.2, start, start + 2 * math.pi * target.settled)
@@ -413,6 +413,75 @@ class CalibrationSurface(Surface):
         context.fill()
 
         _caption(context, width, height, target)
+
+
+def _rgb(colour: tuple[int, int, int]) -> tuple[float, ...]:
+    return tuple(channel / 255 for channel in colour)
+
+
+class DwellSurface(Surface):
+    """The ring around a stopped pointer, over the whole screen and out of the pointer's way."""
+
+    def __init__(self, shell: Any, *, scale: float = style.DEFAULT_SCALE) -> None:
+        super().__init__(shell, anchor="fill", title=f"{compositor.APP_ID} dwell")
+        self.body.add_css_class("dwell")
+        self._area = Gtk.DrawingArea()
+        self._area.set_hexpand(True)
+        self._area.set_vexpand(True)
+        self._area.set_draw_func(self._paint)
+        self.body.append(self._area)
+        self._radius = style.RING_RADIUS * style.clamp(scale, style.MIN_SCALE, style.MAX_SCALE)
+        self._motion = motion.RingMotion()
+        self._frame: motion.RingFrame | None = None
+        self._allowed = True
+        self._ticking = False
+
+    def draw(self, ring: DwellRing | None, *, allowed: bool) -> None:
+        """Take the ring the last frame described, and start animating it."""
+        self._allowed = allowed
+        self._motion.show(ring, now=_milliseconds())
+        self._advance(_milliseconds())
+        if self._motion.busy and not self._ticking:
+            self._ticking = True
+            self.window.add_tick_callback(self._step)
+
+    def _step(self, _widget: Any, clock: Any) -> bool:
+        """One frame of the fill, the flash or the fade, on GTK's frame clock."""
+        self._advance(clock.get_frame_time() / 1000.0)
+        self._ticking = self._motion.busy
+        return GLib.SOURCE_CONTINUE if self._ticking else GLib.SOURCE_REMOVE
+
+    def _advance(self, now: float) -> None:
+        frame = self._motion.frame(now)
+        if frame != self._frame:
+            self._frame = frame
+            self._area.queue_draw()
+        self.visible(self._allowed and frame is not None)
+
+    def visible(self, showing: bool) -> None:
+        if showing != self.window.get_visible():
+            super().visible(showing)
+
+    def _paint(self, _area: Any, context: Any, width: int, height: int) -> None:
+        frame = self._frame
+        if frame is None or cairo is None:
+            return
+        x, y = frame.x * width, frame.y * height
+        radius = self._radius * frame.spread
+        context.set_source_rgba(0.0, 0.0, 0.0, 0.35 * frame.alpha)
+        context.set_line_width(6.0)
+        context.arc(x, y, radius, 0, 2 * math.pi)
+        context.stroke()
+        context.set_source_rgba(1.0, 1.0, 1.0, 0.22 * frame.alpha)
+        context.set_line_width(3.0)
+        context.arc(x, y, radius, 0, 2 * math.pi)
+        context.stroke()
+        if frame.progress > 0.0:
+            context.set_source_rgba(*_rgb(style.RING_RGB), 0.95 * frame.alpha)
+            context.set_line_width(3.5)
+            start = -math.pi / 2
+            context.arc(x, y, radius, start, start + 2 * math.pi * frame.progress)
+            context.stroke()
 
 
 def _caption(context: Any, width: int, height: int, target: render.Target) -> None:
@@ -560,6 +629,7 @@ class Hud:
             width=round(SHEET_WIDTH * style.clamp(scale, style.MIN_SCALE, style.MAX_SCALE)),
         )
         self.calibration = CalibrationSurface(self.shell.usable)
+        self.dwell = DwellSurface(self.shell.usable, scale=scale)
         self.outcome = report(self.shell, self.chip.layered)
         self.output = compositor.Output()
         self._asked: tuple[str, bool] | None = None
@@ -619,7 +689,7 @@ class Hud:
         if name and self.output.connector is None:
             logger.warning("%s", compositor.explain_absent(tuple(present), name=name, only=only))
         monitor = present.get(self.output.connector or "")
-        for surface in (self.chip, self.sheet, self.calibration):
+        for surface in (self.chip, self.sheet, self.calibration, self.dwell):
             surface.pin(monitor)
 
     def _redraw(self) -> bool:
@@ -641,6 +711,7 @@ class Hud:
         target = render.target_of(state)
         self.calibration.draw(target)
         self.calibration.visible(allowed and target is not None)
+        self.dwell.draw(render.ring_of(state), allowed=allowed)
         return False
 
     def _room_for(self, panel: render.Panel | None) -> float:
