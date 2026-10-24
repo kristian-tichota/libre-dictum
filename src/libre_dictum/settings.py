@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from difflib import get_close_matches
@@ -357,13 +357,13 @@ class ModeSettings:
     transformer: TransformerSettings | None = None
     pointer: PointerSettings = PointerSettings()
 
-    def labelled_responses(self) -> tuple[tuple[str, str], ...]:
+    def labelled_responses(self, *, commands: bool = True) -> tuple[tuple[str, str], ...]:
         """Every response the mode can execute, each labelled with where it came from."""
         lifecycle = (("enter_command", self.enter_command), ("exit_command", self.exit_command))
         return (
             *(
                 (self._attribute(f"Command {c.pattern.template!r}", c.origin), c.response)
-                for c in self.commands
+                for c in (self.commands if commands else ())
             ),
             *(
                 (
@@ -389,6 +389,19 @@ class ModeSettings:
         if origin is None or origin.group == self.name:
             return label
         return f"{label} (imported from {origin.group} in {origin.source})"
+
+
+def _locked_names(response: str) -> Iterator[str]:
+    """The modes every lock(...) in response adds the commands of."""
+    if "lock(" not in response:
+        return
+    try:
+        tokens = validate_response(response)
+    except CommandSyntaxError:
+        return
+    for token in tokens:
+        if isinstance(token, VerbToken) and token.verb == "lock":
+            yield from parse_names(token.argument)
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,6 +459,22 @@ class AppSettings:
             if spoken_phrase(name) == phrase:
                 return name
         return None
+
+    def lock_templates(self) -> tuple[str, ...]:
+        """Every mode whose commands some lock(...) adds to the voice modes."""
+        responses = [
+            response
+            for mode in self.layer_modes.values()
+            for _, response in mode.labelled_responses()
+        ]
+        if self.control is not None:
+            responses.extend(self.control.commands.values())
+        found = (
+            name if name in self.layer_modes else self.layer_mode_named(spoken_phrase(name))
+            for response in responses
+            for name in _locked_names(response)
+        )
+        return tuple(dict.fromkeys(name for name in found if name is not None))
 
     def starting_for(self, layer: Layer) -> str | None:
         """Which mode one layer is configured to start in."""
@@ -970,11 +999,7 @@ def _build_mode(
     return ModeSettings(
         name=name,
         kind=kind,
-        commands=(
-            ()
-            if kind is ModeKind.IMPORT
-            else _commands(raw, name, kind, _origins(resolved, "commands", sources))
-        ),
+        commands=_commands(raw, name, kind, _origins(resolved, "commands", sources)),
         aliases=dict(raw.get("aliases", {})),
         banned_strings=frozenset(spoken_phrase(s) for s in raw.get("banned_strings", [])),
         gestures=_edge_bindings(raw, name, section="gestures", what="gesture"),
@@ -1714,14 +1739,29 @@ def _check_mode_target(target: str, settings: AppSettings, *, where: str) -> Non
 
 
 def _check_lock(argument: str, settings: AppSettings, *, where: str) -> None:
-    """Reject a lock(...) that leaves open a mode the voice layer could never enter."""
+    """Reject a lock(...) adding the commands of a missing mode, or ones VOSK cannot hear."""
     for name in parse_names(argument):
-        if name not in settings.modes and settings.mode_named(spoken_phrase(name)) is None:
-            known = ", ".join(sorted(settings.modes))
+        found = (
+            name if name in settings.layer_modes else settings.layer_mode_named(spoken_phrase(name))
+        )
+        if found is None:
+            known = ", ".join(sorted(settings.layer_modes))
             raise ConfigError(
-                f"{where} has lock({argument}): {name!r} is not a runnable mode. "
+                f"{where} has lock({argument}): {name!r} is not a defined mode. "
                 f"Known modes: {known}."
             )
+        for command in settings.layer_modes[found].commands:
+            if command.pattern.has_rest:
+                raise ConfigError(
+                    f"{where} has lock({argument}): {command.pattern.template!r} in {found!r} "
+                    "uses {rest}, which a VOSK grammar cannot express."
+                )
+
+
+def _check_tell(argument: str, *, where: str) -> None:
+    """Reject a tell() that names nothing for a display to act on."""
+    if not argument.strip():
+        raise ConfigError(f"{where} has tell() with no name; a display acts on the name told.")
 
 
 def _check_typeable(text: str, *, where: str) -> None:
@@ -1765,8 +1805,10 @@ def _check_sleep(argument: str, *, where: str, verb: str) -> None:
 
 def _check_responses(settings: AppSettings) -> None:
     """Reject every response that could never run, before a single model is loaded."""
+    locking = set(settings.lock_templates())
     for name, mode in settings.layer_modes.items():
-        for label, response in mode.labelled_responses():
+        checked = mode.kind is not ModeKind.IMPORT or name in locking
+        for label, response in mode.labelled_responses(commands=checked):
             _check_response(
                 apply_aliases(response, mode.aliases), settings, where=f"{label} of mode {name!r}"
             )
@@ -1800,6 +1842,8 @@ def _check_response(expanded: str, settings: AppSettings, *, where: str) -> None
             _check_sleep(token.argument, where=where, verb=token.verb)
         if isinstance(token, VerbToken) and token.verb == "lock":
             _check_lock(token.argument, settings, where=where)
+        if isinstance(token, VerbToken) and token.verb == "tell":
+            _check_tell(token.argument, where=where)
 
 
 def parse_settings(

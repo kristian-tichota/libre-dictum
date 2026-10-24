@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ...errors import ProtocolError
-from ..protocol import Catalogue, State, check_socket_path, read_frames
+from ..protocol import Catalogue, Frame, State, Tell, check_socket_path, read_frames
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,9 @@ class HudClient:
             self._socket = None
             connection.close()
 
-    def _accept(self, frame: Catalogue | State) -> None:
+    def _accept(self, frame: Frame) -> None:
+        if isinstance(frame, Tell):
+            return
         if isinstance(frame, Catalogue):
             self.catalogue = frame
         else:

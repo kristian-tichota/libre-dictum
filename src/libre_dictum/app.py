@@ -150,6 +150,7 @@ class Application:
         self._dwell_at = 0.0
         self._dwell_ring: DwellRing | None = None
         self._button_held = False
+        self._controlling: str | None = None
 
         self.executor = InputExecutor(
             backend,
@@ -158,6 +159,7 @@ class Application:
             sleeper=self._request_sleep,
             on_held_change=self._on_held,
             display=self._on_hud,
+            teller=self._on_tell,
             recenter=self._recenter,
         )
         self.indicator = self._create_indicator(settings)
@@ -391,7 +393,14 @@ class Application:
         self.modes.switch(name, from_program)
 
     def _lock_modes(self, locked: bool, argument: str) -> None:
-        self.modes.lock(locked, parse_names(argument))
+        self.modes.lock(locked, parse_names(argument), holder=self._controlling)
+
+    def _on_tell(self, name: str) -> None:
+        """tell(...) in a response."""
+        if self.hud is None:
+            logger.warning("tell(%s) ignored: no display socket was opened", name)
+            return
+        _tell(DISPLAY_SUBSYSTEM, partial(self.hud.tell, name))
 
     def _on_control(self, request: str) -> str | None:
         """Run the response another program asked for by name, or say why not."""
@@ -404,8 +413,12 @@ class Application:
             logger.warning("No control command is named %r", request)
             return f"no control command is named {request!r}"
         logger.info("Control command: %s", name)
-        if not self.executor.execute(response, from_program=True):
-            return f"{name!r} did not run; see the log"
+        self._controlling = name
+        try:
+            if not self.executor.execute(response, from_program=True):
+                return f"{name!r} did not run; see the log"
+        finally:
+            self._controlling = None
         return None
 
     def _on_rotation(

@@ -67,6 +67,7 @@ class InputExecutor:
         locker: Callable[[bool, str], None] | None = None,
         on_held_change: Callable[[HeldInput], None] | None = None,
         display: Callable[[str], None] | None = None,
+        teller: Callable[[str], None] | None = None,
         recenter: Callable[[], None] | None = None,
         sleeper: Callable[[str, bool, Layer | None, bool], None] | None = None,
         sleep: Callable[[float], None] = time.sleep,
@@ -76,6 +77,7 @@ class InputExecutor:
         self._locker = locker
         self._on_held_change = on_held_change
         self._display = display
+        self._teller = teller
         self._recenter = recenter
         self._sleeper = sleeper
         self._sleep = sleep
@@ -95,6 +97,7 @@ class InputExecutor:
             "script": self._verb_script,
             "type": self._verb_type,
             "hud": self._verb_hud,
+            "tell": self._verb_tell,
             "recenter": self._verb_recenter,
             "sleep": self._verb_sleep,
             "wake": self._verb_wake,
@@ -282,6 +285,13 @@ class InputExecutor:
             return
         self._display(argument)
 
+    def _verb_tell(self, argument: str) -> None:
+        """Hand every connected display a name to act on once."""
+        if self._teller is None:
+            logger.warning("tell(%s) ignored: no display is running", argument)
+            return
+        self._teller(argument.strip())
+
     def _verb_sleep(self, argument: str) -> None:
         """Put mechanisms beyond reach."""
         self._request_sleep(argument, asleep=True)
@@ -299,7 +309,7 @@ class InputExecutor:
         self._sleeper(argument, asleep, self._origin, self._from_program)
 
     def _verb_lock(self, argument: str) -> None:
-        """Leave mode switches to programs, except into the modes argument names and back."""
+        """Keep the layers programs set, adding the commands of the modes argument names."""
         self._set_lock(True, argument)
 
     def _verb_unlock(self, argument: str) -> None:

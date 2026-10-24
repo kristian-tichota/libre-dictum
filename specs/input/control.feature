@@ -53,7 +53,7 @@ Feature: Commands from other programs
   @design-decision
   Rule: A program can lock the mode switches
 
-    While locked, every switch a mechanism asks for is refused and a program's still runs, so
+    While locked, a mechanism moves the voice layer alone and a program still moves any layer, so
     the layouts a program set stay set until it changes them (decision 32).
 
     Background:
@@ -61,65 +61,102 @@ Feature: Commands from other programs
       And the control command "break unlocked" is mapped to "unlock() + mode(pedal:voice)"
       And a program sends "break locked"
 
-    Scenario: A spoken mode name switches nothing
+    Scenario: A spoken mode name moves the voice layer alone
       When I say "mouse mode"
-      Then the voice layer is in "command mode"
+      Then the voice layer is in "mouse mode"
       And the pedal layer is in "break pedals"
 
-    Scenario: A gesture's switch is refused
+    Scenario: A gesture's switch moves the voice layer alone
       When the gesture "smile" is mapped to "mode(mouse mode)" and fires
-      Then the voice layer is in "command mode"
+      Then the voice layer is in "mouse mode"
+      And the pedal layer is in "break pedals"
+
+    Scenario: A mechanism's move of a layer the program holds is refused
+      When a gesture runs "mode(pedal:voice)"
+      Then the pedal layer is in "break pedals"
 
     Scenario: A program still moves the layers
       When a program sends "break over"
       Then the pedal layer is in "command mode"
 
-    Scenario: Unlocking lets every mechanism switch again
+    Scenario: Unlocking lets a mechanism move every layer again
       When a program sends "break unlocked"
       And I say "mouse mode"
-      Then the voice layer is in "mouse mode"
+      Then the pedal layer is in "mouse mode"
 
     @accessibility-critical
-    Scenario: A mode the lock leaves open takes the voice layer alone, and back
-      # Dictation has to stay reachable over a program that covers the screen.
-      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
-      And a program sends "break open"
-      When I say "dictate mode"
-      Then the voice layer is in "dictate mode"
-      And the pedal layer is in "break pedals"
-      When the voice layer runs "mode(previous mode)"
+    Scenario: Going back leads to the voice mode the program set
+      # A one-step memory bounces between the two modes entered last, and neither of them is
+      # the way out.
+      When the gesture "smile" is mapped to "mode(mouse mode)" and fires
+      And I say "dictate mode"
+      And the voice layer runs "mode(previous mode)"
       Then the voice layer is in "command mode"
-      And the pedal layer is in "break pedals"
 
     @accessibility-critical
-    Scenario: Asking for the open mode again goes back
-      # The asking layer stayed put, so its binding still names the open mode: a toggle has to
+    Scenario: Asking for the voice layer's own mode again goes back
+      # The asking layer stayed put, so its binding still names that mode: a toggle has to
       # toggle under the lock as well.
-      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
-      And a program sends "break open"
-      When the gesture "smile" is mapped to "mode(dictate mode)" and fires
+      When the gesture "smile" is mapped to "mode(mouse mode)" and fires
       And the gesture "smile" fires again
       Then the voice layer is in "command mode"
       And the pedal layer is in "break pedals"
 
-    Scenario: Asking for its voice layer again stays
-      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
-      And a program sends "break open"
-      When I say "dictate mode"
-      And a gesture runs "mode(voice:dictate mode)"
-      Then the voice layer is in "dictate mode"
+    Scenario: Naming the voice layer's own mode qualified stays
+      When I say "mouse mode"
+      And a gesture runs "mode(voice:mouse mode)"
+      Then the voice layer is in "mouse mode"
 
-    Scenario: A mode the lock leaves open must be runnable
-      Given the control command "go" is mapped to "lock(nonsense)"
-      When the configuration is loaded
-      Then loading fails with an error naming "not a runnable mode"
+    Scenario: A program's voice switch is the new way back
+      Given the control command "break symbols" is mapped to "mode(voice:symbol mode)"
+      When a program sends "break symbols"
+      And I say "mouse mode"
+      And I say "previous mode"
+      Then the voice layer is in "symbol mode"
 
     @accessibility-critical
     Scenario: A reload lifts the lock
       # A program that dies while locked would otherwise leave the lock for ever.
       When I say "reload config"
       And I say "mouse mode"
-      Then the voice layer is in "mouse mode"
+      Then the pedal layer is in "mouse mode"
+
+  Rule: A program's commands apply while it holds the lock
+
+    Background:
+      Given the template "::break" maps "wall home" to "tell(home)"
+      And the control command "break commands" is mapped to "lock(::break) + mode(pedal:break pedals)"
+      And a program sends "break commands"
+
+    Scenario: They work in every command mode
+      When I say "mouse mode"
+      And I say "wall home"
+      Then every display is told "home"
+
+    Scenario: They win over the mode's own
+      Given "command mode" maps "wall home" to "ctrl + home"
+      When I say "wall home"
+      Then every display is told "home"
+      And no key is emitted
+
+    Scenario: A dictation mode types them
+      When I say "dictate mode"
+      And I say "wall home"
+      Then no display is told anything
+
+    Scenario: They end with the lock
+      Given the control command "break unlocked" is mapped to "unlock() + mode(pedal:voice)"
+      When a program sends "break unlocked"
+      And I say "wall home"
+      Then no display is told anything
+
+    Scenario: Every command recognizer can hear them
+      Then the grammar of "command mode" holds "wall home"
+
+    Scenario: A lock naming no mode is refused
+      Given the control command "go" is mapped to "lock(nonsense)"
+      When the configuration is loaded
+      Then loading fails with an error naming "not a defined mode"
 
   Rule: Anything else is refused
 

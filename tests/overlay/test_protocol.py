@@ -247,12 +247,17 @@ class TestEveryFieldSurvivesTheWire:
 
         assert round_trip(filled) == filled
 
+    def test_a_told_name_comes_back(self):
+        assert protocol.decode(protocol.encode(protocol.Tell("home"))) == protocol.Tell("home")
+
 
 _NON_DEFAULT: dict[str, object] = {
     "revision": 7,
     "mode": "root mode",
     "gesture_mode": "mouse mode",
     "pedal_mode": "scrolling",
+    "held_by": "traker deck",
+    "lock_commands": ("::traker",),
     "asleep": ("voice", "gesture"),
     "wake_with": ("pedal",),
     "confirming": "sleep? again to confirm",

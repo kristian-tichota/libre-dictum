@@ -1063,6 +1063,23 @@ class TestThePedalColumnOnTheModesPage:
     def test_a_template_is_not_a_row(self, catalogue):
         assert "scrolling" not in self.rows(self.panel(catalogue))
 
+    def test_a_program_holding_the_lock_is_named_with_its_layouts(self, catalogue):
+        frame = protocol.state_of(
+            model.Snapshot(
+                layers=LayerState(
+                    voice="root mode", gesture="root mode", pedal="scrolling", held_by="traker deck"
+                )
+            ),
+            revision=1,
+            chip=True,
+            sheet=True,
+            page="modes",
+        )
+
+        panel = render.panel_of(frame, catalogue(PEDALLED))
+
+        assert panel.hint == "traker deck: pedals scrolling · gestures root mode"
+
     def test_a_switch_that_moves_only_a_layer_is_not_a_transition_here(self, catalogue):
         panel = self.panel(catalogue)
         voice = dict(zip(panel.columns, self.rows(panel)["other mode"].items, strict=True))

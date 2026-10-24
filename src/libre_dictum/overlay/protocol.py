@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..health import Health
     from .model import Entry, Group, ModeView, Snapshot
 
-PROTOCOL_VERSION = 13
+PROTOCOL_VERSION = 14
 
 PAGES = ("index", "group", "modes", "pedals", "gestures")
 
@@ -194,6 +194,8 @@ class State:
     mode: str | None = None
     gesture_mode: str | None = None
     pedal_mode: str | None = None
+    held_by: str | None = None
+    lock_commands: tuple[str, ...] = ()
     asleep: tuple[str, ...] = ()
     wake_with: tuple[str, ...] = ()
     confirming: str | None = None
@@ -228,12 +230,24 @@ class State:
         return self.partial is not None
 
 
-Frame = Catalogue | State
+@dataclass(frozen=True, slots=True)
+class Tell:
+    """A name every display may act on once, sent by tell(...)."""
+
+    name: str
+
+
+Frame = Catalogue | State | Tell
 
 
 def encode(frame: Frame) -> bytes:
     """One frame as the bytes to write, terminator included."""
-    payload = _catalogue_json(frame) if isinstance(frame, Catalogue) else _state_json(frame)
+    if isinstance(frame, Tell):
+        payload: dict[str, Any] = {"kind": "tell", "name": frame.name}
+    elif isinstance(frame, Catalogue):
+        payload = _catalogue_json(frame)
+    else:
+        payload = _state_json(frame)
     payload["protocol"] = PROTOCOL_VERSION
     return (json.dumps(payload, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
 
@@ -296,6 +310,8 @@ def _state_json(state: State) -> dict[str, Any]:
         "mode": state.mode,
         "gesture_mode": state.gesture_mode,
         "pedal_mode": state.pedal_mode,
+        "held_by": state.held_by,
+        "lock_commands": list(state.lock_commands),
         "asleep": list(state.asleep),
         "wake_with": list(state.wake_with),
         "confirming": state.confirming,
@@ -393,6 +409,8 @@ def decode(line: bytes | str) -> Frame:
         return _catalogue_from(payload)
     if kind == "state":
         return _state_from(payload)
+    if kind == "tell":
+        return Tell(name=_string(payload, "name"))
     raise ProtocolError(f"unknown frame kind {kind!r}")
 
 
@@ -490,6 +508,8 @@ def _state_from(payload: Mapping[str, Any]) -> State:
         mode=_optional_string(payload, "mode"),
         gesture_mode=_optional_string(payload, "gesture_mode"),
         pedal_mode=_optional_string(payload, "pedal_mode"),
+        held_by=_optional_string(payload, "held_by"),
+        lock_commands=_strings(payload, "lock_commands"),
         asleep=_strings(payload, "asleep"),
         wake_with=_strings(payload, "wake_with"),
         confirming=_optional_string(payload, "confirming"),
@@ -841,6 +861,8 @@ def state_of(
         mode=snapshot.layers.voice,
         gesture_mode=snapshot.layers.gesture,
         pedal_mode=snapshot.layers.pedal,
+        held_by=snapshot.layers.held_by,
+        lock_commands=snapshot.layers.commands,
         asleep=tuple(layer.value for layer in Layer if layer in snapshot.sleep.asleep),
         wake_with=tuple(layer.value for layer in Layer if layer in snapshot.sleep.owners),
         confirming=snapshot.sleep.prompt,

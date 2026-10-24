@@ -82,6 +82,15 @@ Feature: Showing what the session is doing, in a process of its own
       Then the display is waiting on the latest picture only
       And that picture says "alt" is held
 
+    Scenario: A told name reaches every display once
+      # tell(...) is how a program that reads this socket hears a command meant for it,
+      # whichever window has the keyboard. A display that does not know the name ignores it.
+      Given mode "root mode" maps "wall home" to "tell(home)"
+      And a display connects
+      When I say "wall home"
+      Then the display is sent a frame telling "home" after the picture
+      And a display that connects afterwards is not sent it
+
     Scenario: A second core is refused rather than stealing the socket
       # Two of them would both be holding /dev/uinput. A socket left behind by a crash
       # refuses connections and is replaced.
@@ -476,6 +485,14 @@ Feature: Showing what the session is doing, in a process of its own
       When I say "overlay modes"
       Then "previous mode" is a row of its own
       And it reads "anything you say", not "{rest}"
+
+    Scenario: A program holding the lock is named with the layouts it set
+      # Under the lock the program's view decides what a pedal or gesture does, so the page
+      # says which view that is rather than a generic hint.
+      Given the control command "traker deck" is mapped to "lock() + mode(pedal:anki mode) + mode(gesture:::hand pedals)"
+      When a program sends "traker deck"
+      And I say "overlay modes"
+      Then the modes page hint reads "traker deck: pedals anki mode · gestures hand pedals"
 
     Scenario: A page and a group can never disagree about what is showing
       # A group name is what distinguishes the index from a group, and the page is asked about

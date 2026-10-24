@@ -29,7 +29,7 @@ _IDLE_POLL_SECONDS = 0.2
 
 
 class _Client:
-    """One connected display, and the two frames waiting to be written to it."""
+    """One connected display, and the frames waiting to be written to it."""
 
     def __init__(self, connection: socket.socket, *, on_close: Callable[[_Client], None]) -> None:
         self._connection = connection
@@ -39,6 +39,7 @@ class _Client:
         self._stopping = threading.Event()
         self._catalogue: protocol.Catalogue | None = None
         self._state: protocol.State | None = None
+        self._told: list[protocol.Tell] = []
         self._revision = -1
         self._writer: threading.Thread | None = None
 
@@ -55,6 +56,12 @@ class _Client:
             self._state = state
         self._waiting.set()
 
+    def tell(self, told: protocol.Tell) -> None:
+        """Queue a name to write once, after the picture."""
+        with self._lock:
+            self._told.append(told)
+        self._waiting.set()
+
     def close(self) -> None:
         """Stop writing and hang up."""
         self._stopping.set()
@@ -62,10 +69,14 @@ class _Client:
         with contextlib.suppress(OSError):
             self._connection.close()
 
-    def _take(self) -> tuple[protocol.Catalogue | None, protocol.State | None]:
+    def _take(self) -> list[protocol.Frame]:
         with self._lock:
-            pending = (self._catalogue, self._state)
+            pending: list[protocol.Frame] = [
+                frame for frame in (self._catalogue, self._state) if frame is not None
+            ]
+            pending.extend(self._told)
             self._catalogue = self._state = None
+            self._told = []
             return pending
 
     def _run(self) -> None:
@@ -74,9 +85,8 @@ class _Client:
                 if not self._waiting.wait(_IDLE_POLL_SECONDS):
                     continue
                 self._waiting.clear()
-                catalogue, state = self._take()
-                for frame in (catalogue, state):
-                    if frame is not None and not self._stopping.is_set():
+                for frame in self._take():
+                    if not self._stopping.is_set():
                         self._connection.sendall(protocol.encode(frame))
         except OSError as exc:
             logger.info("Display disconnected: %s", exc)
@@ -479,6 +489,15 @@ class HudService:
             self.toggle_meters()
         else:
             logger.warning("hud(%s) is not something a display can do", target)
+
+    def tell(self, name: str) -> None:
+        """What tell(...) in a response asks for: every display hears name once."""
+        with self._lock:
+            clients = list(self._clients)
+        if not clients:
+            logger.info("tell(%s) reached no display", name)
+        for client in clients:
+            client.tell(protocol.Tell(name))
 
     def state(self) -> protocol.State:
         """The frame a display would be sent right now."""

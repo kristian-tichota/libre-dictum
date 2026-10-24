@@ -157,15 +157,17 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     sleep, because a request no mechanism sent cannot be a misread, and a program that covers the
     screen would otherwise leave the user with no way back.
 32. **A program may lock the mode switches, and a reload lifts the lock.** A program that covers the
-    screen sets the layouts its surface needs, and one misfired gesture or misheard mode name would
-    otherwise leave the user in a mode that binds nothing for it. While locked, a bare mode name,
-    the previous-mode phrase and every `mode()` a mechanism runs are refused; a control command's
-    `mode()` still runs, because the program owns the layouts. `lock(dictate mode)` leaves that
-    mode open: a mechanism may move the voice layer alone into it and back to where it came from,
-    so dictation stays reachable while the program's pedal and gesture layouts hold. An unqualified
-    request for the open mode the voice layer already holds also goes back, so a toggle binding
-    still toggles. Sleep is not gated, because it already takes two requests. A reload lifts the lock, so that a program that died while locked
-    cannot make the lock permanent.
+    screen sets the pedal and gesture layouts its surface needs, and one misfired gesture or
+    misheard mode name would otherwise move them to a mode that binds nothing for it. While locked,
+    a mechanism's switch moves the voice layer alone and its move of the pedal or gesture layer is
+    refused; a control command's `mode()` still moves any layer, because the program owns the
+    layouts. Every voice mode stays reachable, and the way back leads to the voice mode the lock
+    started in or a program last set: the previous-mode phrase and an unqualified request for the
+    voice layer's own mode both go there, so a toggle still toggles and no chain of modes strands
+    the user. `lock(::name)` puts the commands of `::name` ahead of every VOSK mode's own, never a
+    dictation mode's, so a program's phrases exist only while it holds the lock. Sleep is not
+    gated, because it already takes two requests. A reload lifts the lock, so that a program that
+    died while locked cannot make the lock permanent.
 33. **A dictation mode shows the chip whatever its toggle says.** A dictation mode has no partial,
     so a level meter and a silence countdown are the only proof that it hears and the only sign of
     when the utterance will be sent. The toggle itself is untouched, so the chip goes back off once

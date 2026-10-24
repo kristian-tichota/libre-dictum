@@ -59,7 +59,9 @@ class ModeManager:
         self._layer: dict[Layer, str | None] = dict.fromkeys(Layer, None)
         self._before: dict[Layer, str | None] = dict.fromkeys(Layer, None)
         self.locked = False
-        self._open: frozenset[str] = frozenset()
+        self._home: str | None = None
+        self._holder: str | None = None
+        self._commands: tuple[str, ...] = ()
 
         self._executor = executor
         self._on_text = on_text
@@ -183,45 +185,59 @@ class ModeManager:
             voice=self._layer[Layer.VOICE],
             gesture=self._layer[Layer.GESTURE] if self.settings.head_tracking else None,
             pedal=self._layer[Layer.PEDAL] if self.settings.pedal else None,
+            held_by=self._holder,
+            commands=self._commands,
         )
 
-    def lock(self, locked: bool, reachable: Iterable[str] = ()) -> None:
-        """Refuse every switch but a program's while locked, except into reachable and back."""
+    def lock(self, locked: bool, commands: Iterable[str] = (), holder: str | None = None) -> None:
+        """Keep the secondary layers where programs put them, adding commands, while locked."""
         with self._lock:
-            opened = frozenset(
-                name
-                for wanted in (reachable if locked else ())
-                if (name := self._resolve(Layer.VOICE, wanted)) is not None
-            )
-            if (locked, opened) != (self.locked, self._open):
+            named = tuple(self._template(wanted) for wanted in (commands if locked else ()))
+            if (locked, named) != (self.locked, self._commands):
                 logger.info(
                     "Mode switches are %s%s",
                     "locked" if locked else "unlocked",
-                    f", except into {', '.join(sorted(opened))}" if opened else "",
+                    f", adding the commands of {', '.join(named)}" if named else "",
                 )
-            self.locked, self._open = locked, opened
+            if not locked:
+                self._home = None
+            elif not self.locked:
+                self._home = self._layer[Layer.VOICE]
+            self.locked, self._commands = locked, named
+            self._holder = holder if locked else None
+            self._publish_layers()
+
+    def _template(self, name: str) -> str:
+        """The defined mode a lock(...) argument names; checked at load."""
+        if name in self.settings.layer_modes:
+            return name
+        return self.settings.layer_mode_named(spoken_phrase(name)) or name
+
+    def lock_commands(self) -> tuple[ModeSettings, ...]:
+        """The modes whose commands every voice mode takes first while locked."""
+        with self._lock:
+            table = self.settings.layer_modes
+            return tuple(table[name] for name in self._commands if name in table)
 
     def reachable(self, name: str) -> bool:
         """Whether a mechanism may switch to name now."""
         with self._lock:
-            return not self.locked or self._open_target(name) is not None
+            return not self.locked or self._locked_target(name) is not None
 
-    def _open_target(self, name: str) -> str | None:
-        """The voice mode a locked switch reaches: one the lock leaves open, or back from one."""
+    def _locked_target(self, name: str) -> str | None:
+        """The voice mode a locked switch reaches: home for going back or asking again."""
         layer, target = parse_target(name)
         if layer not in (None, Layer.VOICE):
             return None
+        if spoken_phrase(target) == self.settings.previous_mode_keyword:
+            return self._home
         resolved = self._resolve(Layer.VOICE, target)
-        current = self._layer[Layer.VOICE]
-        leaving = current in self._open
-        if leaving and layer is None and resolved == current:
-            return self._before[Layer.VOICE]
-        if resolved in self._open or (leaving and resolved == self._before[Layer.VOICE]):
-            return resolved
-        return None
+        if layer is None and resolved == self._layer[Layer.VOICE]:
+            return self._home
+        return resolved
 
     def switch(self, name: str, from_program: bool = False) -> None:
-        """Move whichever layers name asks for, unless locked against all but programs."""
+        """Move whichever layers name asks for; while locked, a mechanism moves voice alone."""
         layer, target = parse_target(name)
         with self._lock:
             if self.locked and not from_program:
@@ -232,11 +248,13 @@ class ModeManager:
                 self._move(layer, self._resolve(layer, target))
             else:
                 self._switch_every_layer(target)
+            if self.locked and from_program and layer in (None, Layer.VOICE):
+                self._home = self._layer[Layer.VOICE]
             self._publish_layers()
 
     def _switch_while_locked(self, name: str) -> None:
-        """Move the voice layer alone into a mode the lock leaves open, or back out of one."""
-        voice = self._open_target(name)
+        """Move the voice layer alone, refusing a move of a layer a program holds."""
+        voice = self._locked_target(name)
         if voice is None:
             logger.warning("Switching to %r refused: mode switches are locked", name)
             return

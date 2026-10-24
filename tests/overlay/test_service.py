@@ -102,6 +102,29 @@ class TestWhatADisplayIsSent:
         assert second.catalogue().revision >= 1
         assert [key.key for key in second.state().held] == ["shift"]
 
+    def test_a_told_name_follows_the_picture_once(self, service, display):
+        one = display()
+        one.catalogue()
+        one.state()
+
+        service.tell("home")
+
+        assert one.read() == protocol.Tell("home")
+
+    def test_a_display_that_connects_afterwards_is_not_told(self, service, display):
+        first = display()
+        first.catalogue()
+        first.state()
+        service.tell("home")
+        first.read()
+
+        second = display()
+        second.catalogue()
+        second.state()
+        service.set_held(HeldInput(held=("shift",)))
+
+        assert isinstance(second.read(), protocol.State)
+
     def test_held_keys_reach_a_display(self, service, display):
         one = display()
         one.catalogue()

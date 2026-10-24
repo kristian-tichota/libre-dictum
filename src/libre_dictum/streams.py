@@ -49,6 +49,9 @@ def mode_vocabulary(mode: ModeSettings, settings: AppSettings) -> list[str]:
     """Every phrase one mode's recognizer must know beyond its own command patterns."""
     phrases = always_recognized(settings)
     phrases.extend(navigation_phrases(mode, settings))
+    for name in settings.lock_templates():
+        for command in settings.layer_modes[name].commands:
+            phrases.extend(command.pattern.grammar_variants())
     return list(dict.fromkeys(phrases))
 
 

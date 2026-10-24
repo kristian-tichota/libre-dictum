@@ -363,6 +363,7 @@ def panel_of(state: State | None, catalogue: Catalogue | None) -> Panel | None:
         return modes_panel(
             catalogue,
             layers,
+            held=_held(state),
             back=catalogue.sheet_open,
             close=catalogue.sheet_close,
             pedals=to_pedals,
@@ -503,6 +504,7 @@ def modes_panel(
     catalogue: Catalogue,
     layers: Mapping[str, ModeCard | None],
     *,
+    held: str = "",
     back: str = "",
     close: str = "",
     pedals: str = "",
@@ -527,7 +529,7 @@ def modes_panel(
     return Panel(
         layout=Layout.TABLE,
         title=MODES_TITLE,
-        hint=MODES_HINT if len(targets) > 1 else "",
+        hint=held or (MODES_HINT if len(targets) > 1 else ""),
         columns=columns,
         rows=tuple(
             Row(
@@ -754,6 +756,15 @@ def _footer(
         f"{_by(route)} → {_spoken(route.target)}" for route in mode.routes if route.kind != "name"
     )
     return tuple(dict.fromkeys(routes))
+
+
+def _held(state: State) -> str:
+    """ "traker deck: pedals anki mode · gestures hand pedals" while a program holds the lock."""
+    if state.held_by is None:
+        return ""
+    layouts = (("pedals", state.pedal_mode), ("gestures", state.gesture_mode))
+    shown = " · ".join(f"{what} {_spoken(mode)}" for what, mode in layouts if mode is not None)
+    return f"{state.held_by}: {shown}" if shown else state.held_by
 
 
 def _spoken(name: str) -> str:

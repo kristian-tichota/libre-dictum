@@ -16,6 +16,7 @@ from libre_dictum.control.service import ControlService
 from libre_dictum.errors import ConfigError, ProtocolError
 from libre_dictum.layers import Layer
 from libre_dictum.settings import parse_settings
+from libre_dictum.streams import mode_vocabulary
 from tests.conftest import FakeStream
 
 CONFIG = {
@@ -30,14 +31,21 @@ CONFIG = {
             "break woke": "wake() + mode(pedal:break pedals)",
             "break locked": "lock() + mode(pedal:break pedals)",
             "break unlocked": "unlock() + mode(pedal:voice)",
-            "break open": "lock(dictate mode) + mode(pedal:break pedals)",
+            "break commands": "lock(::break) + mode(pedal:break pedals)",
+            "break symbols": "mode(voice:symbol mode)",
         }
     },
     "modes": {
         "command mode": {"type": "vosk", "path": "m"},
         "mouse mode": {"type": "vosk", "path": "m"},
-        "dictate mode": {"type": "vosk", "path": "m"},
+        "symbol mode": {"type": "vosk", "path": "m"},
+        "dictate mode": {
+            "type": "transformer",
+            "model_name": "whisper-turbo",
+            "commands": {"{rest}": "type({1})"},
+        },
         "break pedals": {"pedals": {"right": "space"}},
+        "::break": {"commands": {"wall home": "tell(home)"}},
     },
 }
 
@@ -140,7 +148,7 @@ class TestADeclaredName:
 
 
 class TestTheLock:
-    def test_a_spoken_mode_name_switches_nothing_and_says_so(self, running, socket_path):
+    def test_a_spoken_mode_name_moves_the_voice_layer_alone(self, running, socket_path):
         app = running()
         heard: list = []
         app.dispatcher._on_heard = heard.append
@@ -148,11 +156,20 @@ class TestTheLock:
 
         app.dispatcher.handle("mouse mode")
 
-        assert app.modes.active == "command mode"
-        assert [report.matched for report in heard] == [None]
+        assert app.modes.active == "mouse mode"
+        assert [report.matched for report in heard] == ["mouse mode"]
         assert app.modes.layer_state().pedal == "break pedals"
 
-    def test_a_mechanism_s_switch_is_refused(self, running, socket_path):
+    def test_a_gesture_s_switch_moves_the_voice_layer_alone(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+
+        app.executor.execute("mode(mouse mode)", origin=Layer.GESTURE)
+
+        assert app.modes.active == "mouse mode"
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_a_mechanism_s_move_of_a_held_layer_is_refused(self, running, socket_path):
         app = running()
         send("break locked", socket_path)
 
@@ -168,67 +185,67 @@ class TestTheLock:
 
         assert app.modes.layer_state().pedal == "command mode"
 
-    def test_unlock_lets_every_mechanism_switch_again(self, running, socket_path):
+    def test_unlock_lets_a_mechanism_move_every_layer_again(self, running, socket_path):
         app = running()
         send("break locked", socket_path)
         send("break unlocked", socket_path)
 
         app.dispatcher.handle("mouse mode")
 
-        assert app.modes.active == "mouse mode"
+        assert app.modes.layer_state().pedal == "mouse mode"
 
-    def test_a_mode_it_leaves_open_takes_the_voice_layer_alone(self, running, socket_path):
+    def test_going_back_leads_to_the_voice_mode_the_program_set(self, running, socket_path):
         app = running()
-        send("break open", socket_path)
-
-        app.dispatcher.handle("dictate mode")
-
-        assert app.modes.active == "dictate mode"
-        assert app.modes.layer_state().pedal == "break pedals"
-
-    def test_the_way_back_out_of_it_is_open_too(self, running, socket_path):
-        app = running()
-        send("break open", socket_path)
+        send("break locked", socket_path)
+        app.executor.execute("mode(mouse mode)", origin=Layer.GESTURE)
         app.dispatcher.handle("dictate mode")
 
         app.executor.execute("mode(previous mode)", origin=Layer.VOICE)
 
         assert app.modes.active == "command mode"
-        assert app.modes.layer_state().pedal == "break pedals"
 
-    def test_asking_for_it_again_goes_back(self, running, socket_path):
+    def test_asking_for_the_voice_layer_s_own_mode_again_goes_back(self, running, socket_path):
         app = running()
-        send("break open", socket_path)
-        app.executor.execute("mode(dictate mode)", origin=Layer.GESTURE)
+        send("break locked", socket_path)
+        app.executor.execute("mode(mouse mode)", origin=Layer.GESTURE)
 
-        app.executor.execute("mode(dictate mode)", origin=Layer.GESTURE)
+        app.executor.execute("mode(mouse mode)", origin=Layer.GESTURE)
 
         assert app.modes.active == "command mode"
         assert app.modes.layer_state().pedal == "break pedals"
 
-    def test_asking_for_its_voice_layer_again_stays(self, running, socket_path):
+    def test_naming_the_voice_layer_s_own_mode_qualified_stays(self, running, socket_path):
         app = running()
-        send("break open", socket_path)
-        app.dispatcher.handle("dictate mode")
-
-        app.executor.execute("mode(voice:dictate mode)", origin=Layer.GESTURE)
-
-        assert app.modes.active == "dictate mode"
-
-    def test_no_other_mode_is_reached_through_it(self, running, socket_path):
-        app = running()
-        send("break open", socket_path)
-        app.dispatcher.handle("dictate mode")
-
+        send("break locked", socket_path)
         app.dispatcher.handle("mouse mode")
 
-        assert app.modes.active == "dictate mode"
+        app.executor.execute("mode(voice:mouse mode)", origin=Layer.GESTURE)
 
-    def test_a_mode_it_leaves_open_must_be_runnable(self, config_dir):
+        assert app.modes.active == "mouse mode"
+
+    def test_a_program_s_voice_switch_is_the_new_way_back(self, running, socket_path):
+        app = running()
+        send("break locked", socket_path)
+        send("break symbols", socket_path)
+        app.dispatcher.handle("mouse mode")
+
+        app.dispatcher.handle("previous mode")
+
+        assert app.modes.active == "symbol mode"
+
+    def test_the_program_holding_it_is_published(self, running, socket_path):
+        app = running()
+
+        send("break commands", socket_path)
+
+        state = app.modes.layer_state()
+        assert (state.held_by, state.commands) == ("break commands", ("::break",))
+
+    def test_a_lock_naming_no_mode_is_refused(self, config_dir):
         commands = {"go": "lock(nonsense)"}
         config = {**CONFIG, "control": {"commands": commands}}
 
-        with pytest.raises(ConfigError, match="'nonsense' is not a runnable mode"):
+        with pytest.raises(ConfigError, match="'nonsense' is not a defined mode"):
             parse_settings(config, config_dir)
 
     def test_a_reload_lifts_it(self, running, socket_path):
@@ -238,7 +255,63 @@ class TestTheLock:
         app.reload()
         app.dispatcher.handle("mouse mode")
 
-        assert app.modes.active == "mouse mode"
+        assert app.modes.layer_state().pedal == "mouse mode"
+        assert app.modes.layer_state().held_by is None
+
+
+class TestAProgramsCommands:
+    @pytest.fixture
+    def told(self):
+        return []
+
+    def start(self, running, told, config=CONFIG):
+        app = running(config)
+        app.executor._teller = told.append
+        return app
+
+    def test_they_work_in_every_command_mode(self, running, socket_path, told):
+        app = self.start(running, told)
+        send("break commands", socket_path)
+        app.dispatcher.handle("mouse mode")
+
+        app.dispatcher.handle("wall home")
+
+        assert told == ["home"]
+
+    def test_they_win_over_the_mode_s_own(self, running, socket_path, told):
+        modes = {**CONFIG["modes"]}
+        modes["command mode"] = {**modes["command mode"], "commands": {"wall home": "ctrl + home"}}
+        app = self.start(running, told, {**CONFIG, "modes": modes})
+        send("break commands", socket_path)
+
+        app.dispatcher.handle("wall home")
+
+        assert told == ["home"]
+        assert app.backend.sequence == ""
+
+    def test_a_dictation_mode_types_them(self, running, socket_path, told):
+        app = self.start(running, told)
+        send("break commands", socket_path)
+        app.dispatcher.handle("dictate mode")
+
+        app.dispatcher.handle("wall home")
+
+        assert told == []
+        assert app.backend.sequence.startswith("w↓ w↑")
+
+    def test_they_end_with_the_lock(self, running, socket_path, told):
+        app = self.start(running, told)
+        send("break commands", socket_path)
+        send("break unlocked", socket_path)
+
+        app.dispatcher.handle("wall home")
+
+        assert told == []
+
+    def test_every_command_recognizer_can_hear_them(self, config_dir):
+        settings = parse_settings(CONFIG, config_dir)
+
+        assert "wall home" in mode_vocabulary(settings.modes["command mode"], settings)
 
 
 class TestAnythingElse:

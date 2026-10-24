@@ -15,7 +15,7 @@ _REPEAT_RE = re.compile(r"(\d+)\(([^()]*)\)")
 _TOKEN_SEPARATOR_RE = re.compile(r"(?<!\\)\+")
 
 _VERB_RE = re.compile(
-    r"(script|python|exec|mode|hold|release|toggle|save|type|hud|recenter|sleep|wake|lock|unlock)\((.*)\)",
+    r"(script|python|exec|mode|hold|release|toggle|save|type|hud|tell|recenter|sleep|wake|lock|unlock)\((.*)\)",
     re.DOTALL,
 )
 
@@ -50,6 +50,7 @@ ACTION_VERBS = frozenset(
         "save",
         "type",
         "hud",
+        "tell",
         "recenter",
         "sleep",
         "wake",

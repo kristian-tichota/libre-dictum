@@ -44,6 +44,8 @@ class LayerState:
     voice: str | None = None
     gesture: str | None = None
     pedal: str | None = None
+    held_by: str | None = None
+    commands: tuple[str, ...] = ()
 
     def of(self, layer: Layer) -> str | None:
         """The mode one layer is in."""

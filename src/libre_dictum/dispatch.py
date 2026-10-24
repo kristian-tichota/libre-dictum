@@ -9,7 +9,7 @@ from .input.executor import InputExecutor
 from .layers import Layer
 from .modes import ModeManager
 from .overlay.model import Heard, nearest_pattern
-from .settings import ModeSettings
+from .settings import ModeKind, ModeSettings
 from .text import normalize
 
 logger = logging.getLogger(__name__)
@@ -102,35 +102,43 @@ class CommandDispatcher:
             logger.debug("Ignoring banned string %r", utterance)
             return
 
-        for command in mode.commands:
+        owners = self._modes.lock_commands() if mode.kind is ModeKind.VOSK else ()
+        for owner in (*owners, mode):
+            if self._run_match(utterance, owner, sleeping=sleeping):
+                return
+
+        self._report_near_miss(utterance, mode)
+
+    def _run_match(self, utterance: str, owner: ModeSettings, *, sleeping: bool) -> bool:
+        """Run the first command of owner that utterance matches, saying whether one did."""
+        for command in owner.commands:
             captures = command.pattern.match(utterance)
             if captures is None:
                 continue
 
             response = expand_command(command.response, captures)
-            if sleeping and not runnable_while_asleep(response, mode.aliases):
+            if sleeping and not runnable_while_asleep(response, owner.aliases):
                 logger.debug("The voice layer is asleep; %r is not run", utterance)
                 self._report(utterance)
-                return
+                return True
 
             self._report(utterance, matched=command.pattern.template)
             logger.debug(
                 "Matched %r in mode %r: %r -> %r",
                 command.pattern.template,
-                mode.name,
+                owner.name,
                 command.response,
                 response,
             )
             self._executor.execute(
                 response,
-                input_delay=mode.input_delay,
-                type_delay=mode.type_delay,
-                aliases=mode.aliases,
+                input_delay=owner.input_delay,
+                type_delay=owner.type_delay,
+                aliases=owner.aliases,
                 origin=Layer.VOICE,
             )
-            return
-
-        self._report_near_miss(utterance, mode)
+            return True
+        return False
 
     def _switch(self, utterance: str, target: str) -> None:
         """Switch to target, unless mode switches are locked."""
