@@ -91,6 +91,24 @@ Feature: Commands from other programs
       Then the voice layer is in "command mode"
       And the pedal layer is in "break pedals"
 
+    @accessibility-critical
+    Scenario: Asking for the open mode again goes back
+      # The asking layer stayed put, so its binding still names the open mode: a toggle has to
+      # toggle under the lock as well.
+      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
+      And a program sends "break open"
+      When the gesture "smile" is mapped to "mode(dictate mode)" and fires
+      And the gesture "smile" fires again
+      Then the voice layer is in "command mode"
+      And the pedal layer is in "break pedals"
+
+    Scenario: Asking for its voice layer again stays
+      Given the control command "break open" is mapped to "lock(dictate mode) + mode(pedal:break pedals)"
+      And a program sends "break open"
+      When I say "dictate mode"
+      And a gesture runs "mode(voice:dictate mode)"
+      Then the voice layer is in "dictate mode"
+
     Scenario: A mode the lock leaves open must be runnable
       Given the control command "go" is mapped to "lock(nonsense)"
       When the configuration is loaded

@@ -212,7 +212,10 @@ class ModeManager:
         if layer not in (None, Layer.VOICE):
             return None
         resolved = self._resolve(Layer.VOICE, target)
-        leaving = self._layer[Layer.VOICE] in self._open
+        current = self._layer[Layer.VOICE]
+        leaving = current in self._open
+        if leaving and layer is None and resolved == current:
+            return self._before[Layer.VOICE]
         if resolved in self._open or (leaving and resolved == self._before[Layer.VOICE]):
             return resolved
         return None

@@ -162,9 +162,9 @@ stable, so a new decision MUST be appended and MUST NOT be inserted.
     the previous-mode phrase and every `mode()` a mechanism runs are refused; a control command's
     `mode()` still runs, because the program owns the layouts. `lock(dictate mode)` leaves that
     mode open: a mechanism may move the voice layer alone into it and back to where it came from,
-    so dictation stays reachable while the program's pedal and gesture layouts hold. Sleep is not
-    gated, because it
-    already takes two requests. A reload lifts the lock, so that a program that died while locked
+    so dictation stays reachable while the program's pedal and gesture layouts hold. An unqualified
+    request for the open mode the voice layer already holds also goes back, so a toggle binding
+    still toggles. Sleep is not gated, because it already takes two requests. A reload lifts the lock, so that a program that died while locked
     cannot make the lock permanent.
 33. **A dictation mode shows the chip whatever its toggle says.** A dictation mode has no partial,
     so a level meter and a silence countdown are the only proof that it hears and the only sign of

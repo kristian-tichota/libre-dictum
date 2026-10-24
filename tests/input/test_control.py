@@ -196,6 +196,25 @@ class TestTheLock:
         assert app.modes.active == "command mode"
         assert app.modes.layer_state().pedal == "break pedals"
 
+    def test_asking_for_it_again_goes_back(self, running, socket_path):
+        app = running()
+        send("break open", socket_path)
+        app.executor.execute("mode(dictate mode)", origin=Layer.GESTURE)
+
+        app.executor.execute("mode(dictate mode)", origin=Layer.GESTURE)
+
+        assert app.modes.active == "command mode"
+        assert app.modes.layer_state().pedal == "break pedals"
+
+    def test_asking_for_its_voice_layer_again_stays(self, running, socket_path):
+        app = running()
+        send("break open", socket_path)
+        app.dispatcher.handle("dictate mode")
+
+        app.executor.execute("mode(voice:dictate mode)", origin=Layer.GESTURE)
+
+        assert app.modes.active == "dictate mode"
+
     def test_no_other_mode_is_reached_through_it(self, running, socket_path):
         app = running()
         send("break open", socket_path)
